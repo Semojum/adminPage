@@ -1,0 +1,86 @@
+# 운영자 콘솔 자동 배포 — main push 시 빌드 → EC2(semojum-admin-web)로 업로드
+#
+# 구조:
+#   1) Vite 빌드 (실서버 API 설정 주입 — 목업 아님)
+#   2) 서버 22번 포트는 관리자 IP만 허용이므로, 배포 동안만 러너 IP를 SG에 추가했다가 반드시 회수
+#   3) dist를 홈 디렉토리에 올린 뒤 rsync --delete로 서빙 디렉토리(/var/www/admin)에 반영
+#
+# 시크릿 (이 레포 전용 — BE와 공유 없음):
+#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY : IAM semojum-adminpage-actions (admin-web SG 토글 권한만)
+#   ADMIN_SG_ID   : semojum-admin-web-sg
+#   VM_HOST       : 54.116.113.4
+#   VM_SSH_KEY    : adminpage-deploy 전용 키 (BE 서버에는 등록 안 됨)
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Build (production API)
+        env:
+          VITE_API_SOURCE: http
+          VITE_API_BASE_URL: https://api.semojum.app/api
+        run: |
+          npm ci
+          npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Open SSH for runner IP
+        id: open-ssh
+        run: |
+          RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
+          echo "runner_ip=$RUNNER_IP" >> "$GITHUB_OUTPUT"
+          aws ec2 authorize-security-group-ingress \
+            --group-id ${{ secrets.ADMIN_SG_ID }} \
+            --protocol tcp --port 22 --cidr "$RUNNER_IP/32"
+
+      - name: Upload dist
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ubuntu
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: "dist/*"
+          target: "/home/ubuntu/admin-release"
+          strip_components: 1
+          rm: true
+
+      - name: Activate release (rsync --delete)
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ubuntu
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            rsync -a --delete /home/ubuntu/admin-release/ /var/www/admin/
+            curl -sf -o /dev/null http://localhost/ && echo "serving OK"
+
+      # 성공·실패와 무관하게 반드시 회수 — 포트가 열린 채 방치 금지
+      - name: Close SSH for runner IP
+        if: always() && steps.open-ssh.outputs.runner_ip != ''
+        run: |
+          aws ec2 revoke-security-group-ingress \
+            --group-id ${{ secrets.ADMIN_SG_ID }} \
+            --protocol tcp --port 22 --cidr "${{ steps.open-ssh.outputs.runner_ip }}/32"
