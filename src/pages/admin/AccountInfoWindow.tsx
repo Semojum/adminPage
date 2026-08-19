@@ -1,50 +1,70 @@
 import { useParams } from 'react-router-dom'
-import { useAdminAccount } from '@/api/queries'
-import { Card, ErrorBox, Loading, Meter } from '@/components/ui'
+import { useOrg, useOrgs } from '@/api/queries'
+import { Card, Empty, ErrorBox, Loading, Meter } from '@/components/ui'
 import { WindowShell } from '@/layouts/WindowShell'
+import { number, usageRate } from '@/lib/format'
 
 /**
- * T1-8 · 계정 정보 (새 창, T1-6 의 계정 ID)
+ * AD-T1-8 · 계정 정보 (새 창, T1-6 의 계정 ID · 조회 전용)
  *
- * 기획서: 기관 전체 사용량 위에 이 계정 몫을 겹쳐 봅니다. 조회 전용 창입니다.
+ * 계정 하나만 주는 엔드포인트는 명세에 없습니다.
+ * 그래서 GET /api/admin/orgs 의 계정 줄(이번 달 사용 크레딧)과
+ * GET /api/admin/orgs/{orgId} 의 기관 할당·사용량을 합쳐 보여줍니다.
+ *
  * 잠금·삭제·비밀번호 재발급은 T1-6 목록에서 합니다.
  */
 export function AccountInfoWindow() {
-  const { accountId = '' } = useParams()
-  const account = useAdminAccount(accountId)
+  const { loginId = '' } = useParams()
+  const orgs = useOrgs()
 
-  if (account.isPending) {
+  const org = orgs.data?.items.find((item) =>
+    item.accounts.some((account) => account.loginId === loginId),
+  )
+  const account = org?.accounts.find((item) => item.loginId === loginId)
+  const detail = useOrg(org?.orgId ?? '')
+
+  if (orgs.isPending || (org && detail.isPending)) {
     return (
       <div className="window">
         <Loading rows={5} />
       </div>
     )
   }
-  if (account.error || !account.data) {
+  if (orgs.error) {
     return (
       <div className="window">
-        <ErrorBox error={account.error} onRetry={account.refetch} />
+        <ErrorBox error={orgs.error} onRetry={orgs.refetch} />
       </div>
     )
   }
+  if (!org || !account) {
+    return (
+      <WindowShell title={`계정 정보 — ${loginId}`}>
+        <Empty title="계정을 찾지 못했습니다">
+          <p>삭제되었거나 다른 기관으로 옮겨졌을 수 있습니다.</p>
+        </Empty>
+      </WindowShell>
+    )
+  }
 
-  const data = account.data
+  const allocated = detail.data?.creditAllocated ?? 0
+  const orgUsed = detail.data?.creditUsed ?? org.subtotal.monthCredits
 
   return (
-    <WindowShell title={`계정 정보 — ${data.accountId}`}>
+    <WindowShell title={`계정 정보 — ${account.loginId}`}>
       <Card className="card--flat">
         <div className="form">
           <div className="field">
             <span className="field__label">기관</span>
-            <input className="input input--readonly" value={`${data.orgName} · ${data.orgCode}`} readOnly />
+            <input className="input input--readonly" value={`${org.name} · ${org.code}`} readOnly />
           </div>
           <div className="field">
             <span className="field__label">계정 ID</span>
-            <input className="input input--readonly" value={data.accountId} readOnly />
+            <input className="input input--readonly" value={account.loginId} readOnly />
           </div>
           <div className="field">
             <span className="field__label">별칭</span>
-            <input className="input input--readonly" value={data.alias ?? '—'} readOnly />
+            <input className="input input--readonly" value={account.alias ?? '—'} readOnly />
           </div>
         </div>
       </Card>
@@ -52,15 +72,16 @@ export function AccountInfoWindow() {
       <Card>
         <Meter
           label="기관 전체"
-          used={data.orgCredit.used}
-          total={data.orgCredit.total}
-          rate={data.orgCredit.rate}
+          used={orgUsed}
+          total={allocated}
+          rate={usageRate(orgUsed, allocated)}
         />
+        {/* 분모는 기관 할당량입니다 — 이 계정이 기관 몫에서 얼마를 썼는지 보는 값입니다. */}
         <Meter
-          label="이 계정"
-          used={data.accountCredit.used}
-          total={data.accountCredit.total}
-          rate={data.accountCredit.rate}
+          label={`이 계정 (${number(account.monthCredits)} 크레딧 · 이번 달)`}
+          used={account.monthCredits}
+          total={allocated}
+          rate={usageRate(account.monthCredits, allocated)}
         />
       </Card>
 

@@ -1,8 +1,18 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { Bucket } from '@/api/types'
-import { useJobVolume, useLayoutCost, useOrgProfit } from '@/api/queries'
+import { useLayoutCost, useProfitability, useWorkload } from '@/api/queries'
 import { Badge, Card, HBarChart, Query, Segmented, VBarChart } from '@/components/ui'
-import { billingTypeLabel, number, signedPercent, signedWon, won } from '@/lib/format'
+import {
+  bucketLabel,
+  contractTypeLabel,
+  isPaidContract,
+  layoutLongLabel,
+  monthLabel,
+  number,
+  signedPercent,
+  signedWon,
+  won,
+} from '@/lib/format'
 
 const BUCKETS = [
   { value: 'daily', label: '일별' },
@@ -11,18 +21,41 @@ const BUCKETS = [
   { value: 'all', label: '전체' },
 ] as const satisfies ReadonlyArray<{ value: Bucket; label: string }>
 
-/** 명세가 나오면 서버가 내려주는 목록으로 바꿉니다. */
-const MONTHS = ['2026-08', '2026-07', '2026-06']
-
-const monthLabel = (value: string) => {
-  const [year, month] = value.split('-')
-  return `${year}년 ${Number(month)}월`
+/** 막대 라벨 단위 — daily·weekly 는 날짜, monthly·all 은 달 (명세 §workload 범위) */
+const AXIS_UNIT: Record<Bucket, 'day' | 'month'> = {
+  daily: 'day',
+  weekly: 'day',
+  monthly: 'month',
+  all: 'month',
 }
 
-function MonthSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+/** 최근 여섯 달. 서버에 월 목록 API 가 없어 화면이 만듭니다. */
+function recentMonths(count = 6): string[] {
+  const now = new Date()
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - index, 1)
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+  })
+}
+
+function MonthSelect({
+  months,
+  value,
+  onChange,
+}: {
+  months: string[]
+  value: string
+  onChange: (value: string) => void
+}) {
   return (
-    <select className="select" style={{ width: 'auto' }} value={value} onChange={(e) => onChange(e.target.value)}>
-      {MONTHS.map((month) => (
+    <select
+      className="select"
+      style={{ width: 'auto' }}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      aria-label="조회할 달"
+    >
+      {months.map((month) => (
         <option key={month} value={month}>
           {monthLabel(month)}
         </option>
@@ -32,31 +65,33 @@ function MonthSelect({ value, onChange }: { value: string; onChange: (value: str
 }
 
 /**
- * T1-2 · 상세 통계 (T1-1 의 [상세 보기])
+ * AD-T1-2 · 상세 통계 (T1-1 의 [상세 보기])
  *
- * 기획서: 작업량 · 유형별 원가 · 수익성 셋을 봅니다.
+ * GET /api/admin/stats/workload · /layout-cost · /profitability
  */
 export function StatsDetailPage() {
-  const [bucket, setBucket] = useState<Bucket>('weekly')
-  const [layoutMonth, setLayoutMonth] = useState(MONTHS[0])
-  const [profitMonth, setProfitMonth] = useState(MONTHS[0])
+  const months = useMemo(() => recentMonths(), [])
+  const [unit, setUnit] = useState<Bucket>('weekly')
+  const [layoutMonth, setLayoutMonth] = useState(months[0])
+  const [profitMonth, setProfitMonth] = useState(months[0])
 
-  const volume = useJobVolume(bucket)
+  const workload = useWorkload(unit)
   const layout = useLayoutCost(layoutMonth)
-  const profit = useOrgProfit(profitMonth)
+  const profit = useProfitability(profitMonth)
 
   return (
     <>
-      <Card title="작업량" actions={<Segmented value={bucket} options={BUCKETS} onChange={setBucket} />}>
-        <Query state={volume} rows={4}>
+      <Card title="작업량" actions={<Segmented value={unit} options={BUCKETS} onChange={setUnit} />}>
+        <Query state={workload} rows={4}>
           {(data) => (
             <>
               <VBarChart
-                data={data.items.map((point) => ({
-                  label: point.label,
-                  primary: point.done,
-                  secondary: point.failed,
-                  caption: `${number(point.total)}건`,
+                data={data.buckets.map((point) => ({
+                  label: bucketLabel(point.bucket, AXIS_UNIT[data.unit] ?? 'day'),
+                  primary: point.completed,
+                  secondary: point.failedOrCanceled,
+                  // 막대 위 합계는 화면이 더합니다. (명세 §workload)
+                  caption: `${number(point.completed + point.failedOrCanceled)}건`,
                 }))}
               />
               <div className="legend">
@@ -77,17 +112,18 @@ export function StatsDetailPage() {
 
       <Card
         title="레이아웃 유형별 평균 원가"
-        actions={<MonthSelect value={layoutMonth} onChange={setLayoutMonth} />}
+        actions={<MonthSelect months={months} value={layoutMonth} onChange={setLayoutMonth} />}
       >
         <Query state={layout} rows={4}>
           {(data) => (
             <div className="grid-2">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {/* 서버가 비싼 순으로 정렬해 내려줍니다. */}
                 <HBarChart
                   data={data.items.map((row) => ({
-                    label: row.label,
-                    value: row.costPerPage,
-                    display: `${number(row.costPerPage)}원/쪽`,
+                    label: layoutLongLabel[row.layoutType],
+                    value: row.avgKrwPerPage,
+                    display: `${number(Math.round(row.avgKrwPerPage))}원/쪽`,
                   }))}
                 />
                 <p className="card__note">비싼 순으로 정렬 — 요금 설계의 근거</p>
@@ -106,18 +142,29 @@ export function StatsDetailPage() {
                   <tbody>
                     {/* 표는 비중이 큰 순으로 봅니다. 막대는 비싼 순이라 정렬 기준이 다릅니다. */}
                     {[...data.items]
-                      .sort((a, b) => b.share - a.share)
+                      .sort((a, b) => b.sharePct - a.sharePct)
                       .map((row) => (
-                        <tr key={row.type}>
-                          <td>{row.label}</td>
+                        <tr key={row.layoutType}>
+                          <td>{layoutLongLabel[row.layoutType]}</td>
                           <td className="table__num">{number(row.pages)}</td>
-                          <td className="table__num">{row.share}%</td>
+                          <td className="table__num">{Math.round(row.sharePct)}%</td>
                           <td className="table__num">
-                            <Badge
-                              tone={row.momChange === 0 ? 'muted' : row.momChange > 0 ? 'danger' : 'ok'}
-                            >
-                              {signedPercent(row.momChange)}
-                            </Badge>
+                            {/* 전월 0쪽이면 비교 대상이 없습니다. */}
+                            {row.pagesDeltaPct === null ? (
+                              <span className="dash">—</span>
+                            ) : (
+                              <Badge
+                                tone={
+                                  Math.round(row.pagesDeltaPct) === 0
+                                    ? 'muted'
+                                    : row.pagesDeltaPct > 0
+                                      ? 'danger'
+                                      : 'ok'
+                                }
+                              >
+                                {signedPercent(row.pagesDeltaPct)}
+                              </Badge>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -129,18 +176,21 @@ export function StatsDetailPage() {
         </Query>
       </Card>
 
-      <Card title="기관별 수익성" actions={<MonthSelect value={profitMonth} onChange={setProfitMonth} />}>
+      <Card
+        title="기관별 수익성"
+        actions={<MonthSelect months={months} value={profitMonth} onChange={setProfitMonth} />}
+      >
         <Query state={profit} rows={4}>
           {(data) => (
             <div className="grid-2">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <HBarChart
-                  data={data.rows.map((row) => ({
+                  data={data.items.map((row) => ({
                     label: row.orgName,
-                    value: row.profit,
-                    display: signedWon(row.profit),
-                    tone: row.profit < 0 ? 'danger' : 'ok',
-                    strong: row.profit < 0,
+                    value: row.marginKrw,
+                    display: signedWon(row.marginKrw),
+                    tone: row.marginKrw < 0 ? 'danger' : 'ok',
+                    strong: row.marginKrw < 0,
                   }))}
                 />
                 <p className="card__note">차액 = 환산 매출 − 원가</p>
@@ -151,32 +201,35 @@ export function StatsDetailPage() {
                   <thead>
                     <tr>
                       <th>기관</th>
-                      <th>구분</th>
+                      <th>계약 유형</th>
                       <th className="table__num">차감 크레딧</th>
                       <th className="table__num">환산 매출</th>
                       <th className="table__num">원가</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.rows.map((row) => (
+                    {data.items.map((row) => (
                       <tr key={row.orgId}>
                         <td>{row.orgName}</td>
                         <td>
-                          <Badge tone={row.billingType === 'paid' ? 'ok' : 'warn'}>
-                            {billingTypeLabel[row.billingType]}
+                          <Badge tone={isPaidContract(row.contractType) ? 'ok' : 'warn'}>
+                            {contractTypeLabel[row.contractType]}
                           </Badge>
                         </td>
-                        <td className="table__num">{number(row.usedCredit)}</td>
-                        <td className="table__num">{won(row.revenue)}</td>
-                        <td className="table__num">{won(row.cost)}</td>
+                        <td className="table__num">{number(row.creditsUsed)}</td>
+                        <td className="table__num">{won(row.revenueKrw)}</td>
+                        <td className="table__num">
+                          {won(row.costKrw)}
+                          {row.costUncertain && <span className="muted"> *</span>}
+                        </td>
                       </tr>
                     ))}
                     <tr className="table__total">
                       <td>합계</td>
                       <td className="dash">—</td>
-                      <td className="table__num">{number(data.total.usedCredit)}</td>
-                      <td className="table__num">{won(data.total.revenue)}</td>
-                      <td className="table__num">{won(data.total.cost)}</td>
+                      <td className="table__num">{number(data.totals.creditsUsed)}</td>
+                      <td className="table__num">{won(data.totals.revenueKrw)}</td>
+                      <td className="table__num">{won(data.totals.costKrw)}</td>
                     </tr>
                   </tbody>
                 </table>

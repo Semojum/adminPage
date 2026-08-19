@@ -43,16 +43,11 @@ export function AdminLayout() {
             {isMockApi && (
               <>
                 <span className="mock-flag">MOCK</span>
-                <MockRoleSwitch
-                  role="ROLE_ORG_ADMIN"
-                  entry="app"
-                  to="/org"
-                  label="T2 기관 관리 화면"
-                />
+                <MockRoleSwitch role="ROLE_ORG_ADMIN" to="/org" label="T2 기관 관리 화면" />
               </>
             )}
             <span className="app-header__title">운영자 콘솔{subtitle ? ` · ${subtitle}` : ''}</span>
-            <span className="btn btn--sm">{session?.displayName}</span>
+            <span className="btn btn--sm">{session?.loginId}</span>
             <button type="button" className="btn btn--sm" onClick={signOut}>
               로그아웃
             </button>

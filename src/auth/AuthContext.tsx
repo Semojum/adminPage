@@ -4,34 +4,38 @@ import { api } from '@/api'
 import { setUnauthorizedHandler } from '@/api/http/client'
 import type { LoginInput, Session } from '@/api/types'
 
-/** 로그인 진입점. 기획서 §6 권한별 진입 분리에 맞춰 두 갈래로 둡니다. */
-export type Entry = 'admin' | 'app'
-
 export const SESSION_QUERY_KEY = ['session'] as const
 
 interface AuthValue {
   session: Session | null
   /** 세션을 아직 확인하는 중 — 이때 라우트 판단을 미룹니다. */
   loading: boolean
-  login: (entry: Entry, input: LoginInput) => Promise<Session>
+  login: (input: LoginInput) => Promise<Session>
   logout: () => Promise<void>
   loggingIn: boolean
 }
 
 const AuthContext = createContext<AuthValue | null>(null)
 
+/**
+ * 세션.
+ *
+ * V3 명세의 로그인은 하나입니다 — POST /api/auth/login.
+ * 운영자 콘솔이냐 앱이냐는 **응답 role 로 화면이 갈라집니다**(명세 §로그인).
+ * 서버도 /api/admin/** 에서 비ADMIN 토큰을 COMMON4003 으로 막습니다.
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient()
 
   const sessionQuery = useQuery({
     queryKey: SESSION_QUERY_KEY,
+    // 저장해 둔 리프레시 토큰이 아직 살아 있는지 확인해 세션을 복구합니다.
     queryFn: () => api.auth.getSession(),
-    // 세션은 앱이 켜질 때 한 번 확인하고, 로그인·로그아웃에서만 바꿉니다.
     staleTime: Infinity,
     retry: false,
   })
 
-  // 세션이 끊기면(잠금·만료) 캐시를 비웁니다. RequireRole 이 로그인 화면으로 보냅니다.
+  // 재발급까지 실패하면(만료·잠금) 캐시를 비웁니다. RequireRole 이 로그인 화면으로 보냅니다.
   useEffect(() => {
     setUnauthorizedHandler(() => {
       qc.setQueryData(SESSION_QUERY_KEY, null)
@@ -40,8 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [qc])
 
   const loginMutation = useMutation({
-    mutationFn: ({ entry, input }: { entry: Entry; input: LoginInput }) =>
-      entry === 'admin' ? api.auth.loginAdmin(input) : api.auth.loginApp(input),
+    mutationFn: (input: LoginInput) => api.auth.login(input),
     onSuccess: (session) => {
       // 이전 사용자의 데이터가 새 사용자 화면에 남지 않게 전부 비우고 세션만 심습니다.
       qc.clear()
@@ -60,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthValue = {
     session: sessionQuery.data ?? null,
     loading: sessionQuery.isPending,
-    login: (entry, input) => loginMutation.mutateAsync({ entry, input }),
+    login: (input) => loginMutation.mutateAsync(input),
     logout: () => logoutMutation.mutateAsync(),
     loggingIn: loginMutation.isPending,
   }

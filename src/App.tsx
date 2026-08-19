@@ -65,7 +65,7 @@ export function App() {
                 <Route path="/admin/jobs/:jobId" element={<JobDetailWindow />} />
                 <Route path="/admin/jobs/:jobId/preview" element={<JobPreviewWindow />} />
                 <Route path="/admin/orgs/:orgId" element={<OrgInfoWindow />} />
-                <Route path="/admin/accounts/:accountId" element={<AccountInfoWindow />} />
+                <Route path="/admin/accounts/:loginId" element={<AccountInfoWindow />} />
               </Route>
 
               {/* T2 · 기관 관리 — 실제로는 서비스 앱(semo-jum.com) 안의 탭입니다. */}
@@ -73,7 +73,7 @@ export function App() {
                 <Route path="/org" element={<OrgLayout />}>
                   <Route index element={<OrgManagePage />} />
                 </Route>
-                <Route path="/org/accounts/:accountId" element={<OrgAccountDetailWindow />} />
+                <Route path="/org/accounts/:loginId" element={<OrgAccountDetailWindow />} />
               </Route>
 
               <Route path="*" element={<Navigate to="/admin/stats" replace />} />

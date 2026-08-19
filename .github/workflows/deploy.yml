@@ -1,7 +1,7 @@
 # 운영자 콘솔 자동 배포 — main push 시 빌드 → EC2(semojum-admin-web)로 업로드
 #
 # 구조:
-#   1) Vite 빌드 (실서버 API 설정 주입 — 목업 아님)
+#   1) Vite 빌드 (실서버 API 설정 주입 — 목업 아님. BASE_URL 은 호스트만, 경로의 /api 는 코드가 붙임)
 #   2) 서버 22번 포트는 관리자 IP만 허용이므로, 배포 동안만 러너 IP를 SG에 추가했다가 반드시 회수
 #   3) dist를 홈 디렉토리에 올린 뒤 rsync --delete로 서빙 디렉토리(/var/www/admin)에 반영
 #
@@ -35,7 +35,8 @@ jobs:
       - name: Build (production API)
         env:
           VITE_API_SOURCE: http
-          VITE_API_BASE_URL: https://api.semojum.app/api
+          # 경로는 명세 그대로 /api/... 를 쓰므로 여기에는 호스트만 넣습니다.
+          VITE_API_BASE_URL: https://api.semojum.app
         run: |
           npm ci
           npm run build

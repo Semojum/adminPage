@@ -1,765 +1,796 @@
 /**
- * 기획서 V11 의 목업 값을 그대로 옮긴 데이터.
+ * 목업 값 — Figma `AD-T1-*` · `V3-06` 프레임에 그려진 숫자를 그대로 옮겼습니다.
  *
- * 실제 API 가 붙으면 이 파일과 mockApi.ts 는 지워도 됩니다.
+ * 실제 서버가 붙으면(VITE_API_SOURCE=http) 이 파일과 mockApi.ts 는 쓰이지 않습니다.
  * 화면은 이 파일을 직접 import 하지 않습니다 — 반드시 api 를 통해서만 읽습니다.
  */
 import type * as T from '../types'
 
-/**
- * 목업 로그인 계정.
- *
- * 실제 인증이 붙으면 이 목록은 사라집니다. 비밀번호는 목업 전용 문자열입니다.
- * 로그인 화면에도 목업 모드일 때만 이 목록을 안내로 띄웁니다.
- */
+/* ─────────────── 시간 helper ─────────────── */
+/* "오늘 09:12" · "어제" 같은 표기가 목업에서도 살아 있도록 오늘을 기준으로 만듭니다. */
+
+const now = new Date()
+
+const pad = (value: number) => String(value).padStart(2, '0')
+
+/** 로컬 시각을 오프셋 없는 ISO 로 — 서버가 KST 를 그렇게 내려줍니다. */
+function iso(date: Date): string {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
+function at(daysAgo: number, hour: number, minute: number, second = 0): string {
+  const date = new Date(now)
+  date.setDate(date.getDate() - daysAgo)
+  date.setHours(hour, minute, second, 0)
+  return iso(date)
+}
+
+function hoursAgo(hours: number): string {
+  return iso(new Date(now.getTime() - hours * 3_600_000))
+}
+
+const today = new Date(now)
+export const THIS_MONTH = `${today.getFullYear()}-${pad(today.getMonth() + 1)}`
+
+/* ─────────────── 로그인 계정 ─────────────── */
+
 export interface MockAccount {
-  session: T.Session
+  loginId: string
   password: string
-  /** 기획서 §6: 잠긴 계정은 로그인이 막힙니다. */
-  locked?: boolean
+  role: T.Role
+  /** INACTIVE 계정은 AUTH4004 로 막힙니다. */
+  status: T.AccountStatus
   /** 로그인 화면 안내에 적을 설명 */
   hint: string
 }
 
 export const loginAccounts: MockAccount[] = [
-  {
-    password: 'admin1234',
-    hint: '세모점 운영자',
-    session: {
-      accountId: 'admin_taemin',
-      displayName: 'admin_taemin',
-      role: 'ROLE_ADMIN',
-      orgId: null,
-      orgName: null,
-    },
-  },
-  {
-    password: 'kblib1234',
-    hint: '기관 관리자 · 한국점자도서관',
-    session: {
-      accountId: 'org_kblib01',
-      displayName: 'org_kblib01',
-      role: 'ROLE_ORG_ADMIN',
-      orgId: 'org-kblib',
-      orgName: '한국점자도서관',
-    },
-  },
-  {
-    password: 'kblib1234',
-    hint: '점역사 · T3 은 이번 범위 밖',
-    session: {
-      accountId: 'kblib02',
-      displayName: 'kblib02 · 수학 담당',
-      role: 'ROLE_USER',
-      orgId: 'org-kblib',
-      orgName: '한국점자도서관',
-    },
-  },
-  {
-    password: 'kblib1234',
-    locked: true,
-    hint: '잠긴 계정 — 로그인이 막힙니다',
-    session: {
-      accountId: 'kblib03',
-      displayName: 'kblib03',
-      role: 'ROLE_USER',
-      orgId: 'org-kblib',
-      orgName: '한국점자도서관',
-    },
-  },
+  { loginId: 'admin01', password: 'admin1234', role: 'ROLE_ADMIN', status: 'ACTIVE', hint: '세모점 운영자 · T1 콘솔' },
+  { loginId: 'kblib01', password: 'kblib1234', role: 'ROLE_ORG_ADMIN', status: 'ACTIVE', hint: '기관 관리자 · 한국점자도서관 (T2)' },
+  { loginId: 'kblib02', password: 'kblib1234', role: 'ROLE_USER', status: 'ACTIVE', hint: '점역사 · T3 사용량(이번 범위 밖)' },
 ]
 
-/* ─────────────── T1-1 ─────────────── */
+/* ─────────────── T1-1 · 통계 ─────────────── */
 
-export const statsSummary: Record<T.Period, T.StatsSummary> = {
+const HOURLY = [
+  [9, 40],
+  [11, 95],
+  [13, 150],
+  [15, 210],
+  [17, 120],
+  [19, 60],
+] as const
+
+export const statsOverview: Record<T.Period, T.StatsOverview> = {
   today: {
-    jobs: { total: 18, done: 15, processing: 2, failed: 1 },
-    pages: { total: 1204, previous: 1020, previousLabel: '어제', changeRate: 18 },
-    hourly: [
-      { label: '09시', pages: 40 },
-      { label: '11시', pages: 95 },
-      { label: '13시', pages: 150 },
-      { label: '15시', pages: 210 },
-      { label: '17시', pages: 120 },
-      { label: '19시', pages: 60 },
-    ],
+    period: 'today',
+    from: at(0, 0, 0),
+    to: iso(now),
+    jobs: { total: 18, completed: 15, inProgress: 2, failed: 1 },
+    pagesProcessed: 1204,
+    prevPagesProcessed: 1020,
+    series: HOURLY.map(([hour, pages]) => ({ bucket: at(0, hour, 0), pages })),
+    cost: {
+      todayKrw: 38_400,
+      yesterdayKrw: 34_100,
+      thisWeekDailyAvgKrw: 30_400,
+      lastWeekDailyAvgKrw: 27_900,
+      thisWeekTotalKrw: 212_600,
+      thisMonthTotalKrw: 864_300,
+      thisMonthPages: 27_000,
+      krwPerPage: 32,
+      uncertain: false,
+    },
   },
   week: {
-    jobs: { total: 112, done: 98, processing: 3, failed: 11 },
-    pages: { total: 7430, previous: 6820, previousLabel: '지난주', changeRate: 9 },
-    hourly: [
-      { label: '월', pages: 980 },
-      { label: '화', pages: 1240 },
-      { label: '수', pages: 1180 },
-      { label: '목', pages: 1360 },
-      { label: '금', pages: 1520 },
-      { label: '토', pages: 720 },
-      { label: '일', pages: 430 },
-    ],
+    period: 'week',
+    from: at(6, 0, 0),
+    to: iso(now),
+    jobs: { total: 96, completed: 88, inProgress: 2, failed: 6 },
+    pagesProcessed: 6_640,
+    prevPagesProcessed: 6_090,
+    series: [6, 5, 4, 3, 2, 1, 0].map((daysAgo, index) => ({
+      bucket: at(daysAgo, 0, 0),
+      pages: [820, 1_140, 980, 1_260, 900, 1_100, 440][index],
+    })),
+    cost: {
+      todayKrw: 38_400,
+      yesterdayKrw: 34_100,
+      thisWeekDailyAvgKrw: 30_400,
+      lastWeekDailyAvgKrw: 27_900,
+      thisWeekTotalKrw: 212_600,
+      thisMonthTotalKrw: 864_300,
+      thisMonthPages: 27_000,
+      krwPerPage: 32,
+      uncertain: false,
+    },
   },
   month: {
-    jobs: { total: 486, done: 441, processing: 4, failed: 41 },
-    pages: { total: 27000, previous: 24300, previousLabel: '지난달', changeRate: 11 },
-    hourly: [
-      { label: '1주', pages: 5900 },
-      { label: '2주', pages: 6400 },
-      { label: '3주', pages: 6100 },
-      { label: '4주', pages: 8600 },
-    ],
+    period: 'month',
+    from: at(29, 0, 0),
+    to: iso(now),
+    jobs: { total: 412, completed: 386, inProgress: 2, failed: 24 },
+    pagesProcessed: 27_000,
+    prevPagesProcessed: 24_300,
+    series: Array.from({ length: 14 }, (_, index) => ({
+      bucket: at(13 - index, 0, 0),
+      pages: [780, 910, 1_040, 860, 1_180, 990, 1_240, 1_020, 1_160, 880, 1_300, 1_050, 1_120, 1_204][index],
+    })),
+    cost: {
+      todayKrw: 38_400,
+      yesterdayKrw: 34_100,
+      thisWeekDailyAvgKrw: 30_400,
+      lastWeekDailyAvgKrw: 27_900,
+      thisWeekTotalKrw: 212_600,
+      thisMonthTotalKrw: 864_300,
+      thisMonthPages: 27_000,
+      krwPerPage: 32,
+      uncertain: false,
+    },
   },
 }
 
-export const costSummary: Record<T.Period, T.CostSummary> = {
-  today: {
-    series: [
-      { label: '오늘', amount: 38400, emphasis: true },
-      { label: '어제', amount: 34100 },
-      { label: '이번 주 평균', amount: 30400 },
-      { label: '지난주 평균', amount: 27900 },
-    ],
-    weekTotal: { amount: 212600, changeRate: 9 },
-    monthTotal: { amount: 864300, pages: 27000, costPerPage: 32 },
+/* ─────────────── T1-2 · 상세 통계 ─────────────── */
+
+const WEEKLY = [
+  [258, 12],
+  [288, 12],
+  [202, 8],
+  [338, 12],
+  [373, 12],
+  [443, 12],
+] as const
+
+export const workload: Record<T.Bucket, T.Workload> = {
+  daily: {
+    unit: 'daily',
+    buckets: Array.from({ length: 14 }, (_, index) => ({
+      bucket: at(13 - index, 0, 0),
+      completed: [38, 42, 51, 40, 55, 47, 60, 49, 58, 41, 62, 50, 54, 57][index],
+      failedOrCanceled: [2, 1, 3, 2, 1, 2, 4, 1, 2, 1, 3, 2, 1, 2][index],
+    })),
   },
-  week: {
-    series: [
-      { label: '이번 주', amount: 212600, emphasis: true },
-      { label: '지난주', amount: 195300 },
-      { label: '이번 달 주평균', amount: 201400 },
-      { label: '지난달 주평균', amount: 183700 },
-    ],
-    weekTotal: { amount: 212600, changeRate: 9 },
-    monthTotal: { amount: 864300, pages: 27000, costPerPage: 32 },
+  weekly: {
+    unit: 'weekly',
+    buckets: WEEKLY.map(([completed, failedOrCanceled], index) => ({
+      bucket: at((5 - index) * 7, 0, 0),
+      completed,
+      failedOrCanceled,
+    })),
   },
-  month: {
-    series: [
-      { label: '이번 달', amount: 864300, emphasis: true },
-      { label: '지난달', amount: 778500 },
-      { label: '3개월 평균', amount: 802100 },
-      { label: '6개월 평균', amount: 741900 },
-    ],
-    weekTotal: { amount: 212600, changeRate: 9 },
-    monthTotal: { amount: 864300, pages: 27000, costPerPage: 32 },
+  monthly: {
+    unit: 'monthly',
+    buckets: Array.from({ length: 6 }, (_, index) => {
+      const date = new Date(today.getFullYear(), today.getMonth() - (5 - index), 1)
+      return {
+        bucket: iso(date),
+        completed: [880, 940, 1_010, 960, 1_180, 1_240][index],
+        failedOrCanceled: [40, 32, 45, 38, 52, 48][index],
+      }
+    }),
+  },
+  all: {
+    unit: 'all',
+    buckets: Array.from({ length: 9 }, (_, index) => {
+      const date = new Date(today.getFullYear(), today.getMonth() - (8 - index), 1)
+      return {
+        bucket: iso(date),
+        completed: [420, 610, 780, 880, 940, 1_010, 960, 1_180, 1_240][index],
+        failedOrCanceled: [30, 28, 36, 40, 32, 45, 38, 52, 48][index],
+      }
+    }),
   },
 }
 
-/* ─────────────── T1-2 ─────────────── */
-
-export const jobVolume: Record<T.Bucket, T.JobVolumePoint[]> = {
-  daily: [
-    { label: '08-08', done: 52, failed: 6, total: 58 },
-    { label: '08-09', done: 61, failed: 4, total: 65 },
-    { label: '08-10', done: 38, failed: 5, total: 43 },
-    { label: '08-11', done: 70, failed: 8, total: 78 },
-    { label: '08-12', done: 82, failed: 7, total: 89 },
-    { label: '08-13', done: 74, failed: 9, total: 83 },
-  ],
-  weekly: [
-    { label: '7월 1주', done: 232, failed: 38, total: 270 },
-    { label: '2주', done: 262, failed: 38, total: 300 },
-    { label: '3주', done: 186, failed: 24, total: 210 },
-    { label: '4주', done: 312, failed: 38, total: 350 },
-    { label: '8월 1주', done: 344, failed: 41, total: 385 },
-    { label: '2주', done: 408, failed: 47, total: 455 },
-  ],
-  monthly: [
-    { label: '3월', done: 820, failed: 96, total: 916 },
-    { label: '4월', done: 910, failed: 104, total: 1014 },
-    { label: '5월', done: 1080, failed: 121, total: 1201 },
-    { label: '6월', done: 990, failed: 118, total: 1108 },
-    { label: '7월', done: 1130, failed: 138, total: 1268 },
-    { label: '8월', done: 752, failed: 88, total: 840 },
-  ],
-  all: [
-    { label: '2026 상반기', done: 5140, failed: 612, total: 5752 },
-    { label: '2026 하반기', done: 1882, failed: 226, total: 2108 },
+export const layoutCost: T.LayoutCostReport = {
+  month: THIS_MONTH,
+  items: [
+    { layoutType: 'PAGE_LAYOUT_VISUAL', pages: 1_600, sharePct: 6, avgKrwPerPage: 94, pagesDeltaPct: 12 },
+    { layoutType: 'PAGE_LAYOUT_TABLE', pages: 4_100, sharePct: 15, avgKrwPerPage: 58, pagesDeltaPct: 7 },
+    { layoutType: 'PAGE_LAYOUT_FORMULA', pages: 2_900, sharePct: 11, avgKrwPerPage: 46, pagesDeltaPct: 0 },
+    { layoutType: 'PAGE_LAYOUT_TEXT', pages: 18_400, sharePct: 68, avgKrwPerPage: 21, pagesDeltaPct: -4 },
   ],
 }
 
-export const layoutCost: T.LayoutCostRow[] = [
-  { type: 'image', label: '그림·시각', costPerPage: 94, pages: 1600, share: 6, momChange: 12 },
-  { type: 'table', label: '표 포함', costPerPage: 58, pages: 4100, share: 15, momChange: 7 },
-  { type: 'formula', label: '수식 포함', costPerPage: 46, pages: 2900, share: 11, momChange: 0 },
-  { type: 'text', label: '본문 위주', costPerPage: 21, pages: 18400, share: 68, momChange: -4 },
-]
-
-export const orgProfit: T.OrgProfitReport = {
-  rows: [
+export const profitability: T.ProfitReport = {
+  month: THIS_MONTH,
+  // 실제 단가는 GET /api/admin/pricing 의 creditPricesByContract 가 정본입니다.
+  creditPricesByContract: { BASIC: 240, STANDARD: 150, PREMIUM: 120, FREE: 0, COUPON: 0 },
+  items: [
     {
       orgId: 'org-kblib',
       orgName: '한국점자도서관',
-      billingType: 'paid',
-      usedCredit: 4600,
-      revenue: 1104000,
-      cost: 147200,
-      profit: 956800,
+      contractType: 'BASIC',
+      appliedPriceKrw: 240,
+      creditsUsed: 4_600,
+      revenueKrw: 1_104_000,
+      costKrw: 147_200,
+      marginKrw: 956_800,
+      costUncertain: false,
     },
     {
       orgId: 'org-snsb',
       orgName: '서울맹학교',
-      billingType: 'paid',
-      usedCredit: 1870,
-      revenue: 448800,
-      cost: 108460,
-      profit: 340340,
+      contractType: 'BASIC',
+      appliedPriceKrw: 240,
+      creditsUsed: 1_870,
+      revenueKrw: 448_800,
+      costKrw: 108_460,
+      marginKrw: 340_340,
+      costUncertain: false,
     },
     {
-      orgId: 'org-oopub',
+      orgId: 'org-pub',
       orgName: 'OO출판사',
-      billingType: 'coupon',
-      usedCredit: 0,
-      revenue: 0,
-      cost: 77080,
-      profit: -77080,
+      contractType: 'COUPON',
+      appliedPriceKrw: 0,
+      creditsUsed: 0,
+      revenueKrw: 0,
+      costKrw: 77_080,
+      marginKrw: -77_080,
+      costUncertain: false,
     },
   ],
-  total: { usedCredit: 6470, revenue: 1552800, cost: 332740 },
+  totals: { creditsUsed: 6_470, revenueKrw: 1_552_800, costKrw: 332_740, marginKrw: 1_220_060 },
 }
 
-/* ─────────────── T1-3 ─────────────── */
+/* ─────────────── T1-3 · 실시간 모니터링 ─────────────── */
 
 export const jobs: T.JobSummary[] = [
   {
-    id: 'job-1041',
+    jobId: 'job-4001',
     fileName: '모의고사_국어.pdf',
     orgName: '한국점자도서관',
-    pages: 8,
-    durationSec: null,
-    cost: null,
-    status: 'uploaded',
+    loginId: 'kblib01',
+    mode: 'c',
+    status: 'PENDING',
+    totalPages: 8,
+    donePages: null,
+    failedPages: null,
+    costKrw: null,
+    costUncertain: false,
+    startedAt: hoursAgo(0.1),
+    finishedAt: null,
   },
   {
-    id: 'job-1042',
+    jobId: 'job-4002',
     fileName: '수능특강_지구과학.pdf',
     orgName: '서울맹학교',
-    pages: 22,
-    durationSec: null,
-    cost: null,
-    status: 'processing',
-    processedPages: 12,
+    loginId: 'snsb01',
+    mode: 'c',
+    status: 'IN_PROGRESS',
+    totalPages: 22,
+    donePages: 12,
+    failedPages: null,
+    costKrw: null,
+    costUncertain: false,
+    startedAt: hoursAgo(0.3),
+    finishedAt: null,
   },
   {
-    id: 'job-1043',
+    jobId: 'job-4003',
     fileName: '수능특강_생명II.pdf',
     orgName: '한국점자도서관',
-    pages: 14,
-    durationSec: 131,
-    cost: 448,
-    status: 'partialFailed',
+    loginId: 'kblib02',
+    mode: 'c',
+    status: 'COMPLETED',
+    totalPages: 14,
+    donePages: null,
     failedPages: 3,
+    costKrw: 448,
+    costUncertain: false,
+    startedAt: at(0, 10, 22, 14),
+    finishedAt: at(0, 10, 24, 25),
   },
   {
-    id: 'job-1044',
+    jobId: 'job-4004',
     fileName: '중2_국어_2단원.pdf',
     orgName: '한국점자도서관',
-    pages: 28,
-    durationSec: 252,
-    cost: 896,
-    status: 'done',
+    loginId: 'kblib02',
+    mode: 'b',
+    status: 'COMPLETED',
+    totalPages: 28,
+    donePages: null,
+    failedPages: null,
+    costKrw: 896,
+    costUncertain: false,
+    startedAt: at(1, 16, 58, 0),
+    finishedAt: at(1, 17, 2, 12),
   },
 ]
 
-/* ─────────────── T1-4 ─────────────── */
+/* ─────────────── T1-4 · 작업 상세 ─────────────── */
+
+/** 쪽별 결과는 서버가 쪽 단위로 줍니다. "1~7" 처럼 묶어 보이는 것은 화면이 합친 결과입니다. */
+function pageResults(): T.JobPageResult[] {
+  const rows: T.JobPageResult[] = []
+  const push = (
+    pageNo: number,
+    layoutType: T.LayoutType,
+    costKrw: number,
+    failedReason?: string,
+  ) => {
+    rows.push({
+      pageNo,
+      status: failedReason ? 'BLOCKED' : 'COMPLETED',
+      layoutType,
+      costKrw,
+      credit: failedReason ? null : 1,
+      reasons: failedReason ? [failedReason] : [],
+    })
+  }
+
+  for (let page = 1; page <= 7; page += 1) push(page, 'PAGE_LAYOUT_TEXT', 20)
+  push(8, 'PAGE_LAYOUT_TABLE', 42, '표 구조 인식 60초 초과')
+  push(9, 'PAGE_LAYOUT_FORMULA', 46)
+  push(10, 'PAGE_LAYOUT_FORMULA', 46)
+  push(11, 'PAGE_LAYOUT_VISUAL', 70, '이미지 해상도 부족')
+  push(12, 'PAGE_LAYOUT_TABLE', 42)
+  push(13, 'PAGE_LAYOUT_TABLE', 42, '표 구조 인식 60초 초과')
+  push(14, 'PAGE_LAYOUT_TEXT', 20)
+  return rows
+}
 
 export const jobDetails: Record<string, T.JobDetail> = {
-  'job-1043': {
-    id: 'job-1043',
+  'job-4003': {
+    jobId: 'job-4003',
     fileName: '수능특강_생명II.pdf',
-    status: 'partialFailed',
-    failedPages: 3,
+    mode: 'c',
+    status: 'COMPLETED',
     request: {
-      accountId: 'kblib02',
-      accountAlias: '수학 담당',
+      loginId: 'kblib02',
+      alias: '수학 담당',
       orgName: '한국점자도서관',
-      requestedAt: '2026-08-13 10:22:14',
-      ip: '210.94.xxx.118',
-      location: '서울',
-      userAgent: 'Windows 11 · Chrome 141',
+      requestedAt: at(0, 10, 22, 14),
+      clientIp: '211.198.114.11',
+      clientOs: 'Windows 11',
+      clientBrowser: 'Chrome 141',
+      clientUserAgent:
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
     },
     processing: {
-      pages: 14,
+      totalPages: 14,
       successPages: 11,
       failedPages: 3,
-      durationSec: 131,
-      secPerPage: 9.4,
-      cost: 448,
-      costPerPage: 32,
-      credit: 11,
-      layout: { text: 8, table: 3, formula: 2, image: 1 },
-    },
-    pageResults: [
-      { range: '1~7', layout: 'text', layoutLabel: '본문', cost: 154, status: 'done', reason: null },
-      {
-        range: '8',
-        layout: 'table',
-        layoutLabel: '표',
-        cost: 58,
-        status: 'failed',
-        reason: '표 구조 인식 60초 초과',
+      startedAt: at(0, 10, 22, 14),
+      finishedAt: at(0, 10, 24, 25),
+      costKrw: 448,
+      llmCostUsd: 0.28,
+      gpuCostUsd: 0.04,
+      costUncertain: false,
+      credits: 11,
+      layoutCounts: {
+        PAGE_LAYOUT_TEXT: 8,
+        PAGE_LAYOUT_TABLE: 3,
+        PAGE_LAYOUT_FORMULA: 2,
+        PAGE_LAYOUT_VISUAL: 1,
       },
-      { range: '9~10', layout: 'formula', layoutLabel: '수식', cost: 92, status: 'done', reason: null },
-      {
-        range: '11 · 13',
-        layout: 'image',
-        layoutLabel: '그림',
-        cost: 144,
-        status: 'failed',
-        reason: '이미지 해상도 부족',
-      },
-    ],
-  },
-  'job-1044': {
-    id: 'job-1044',
-    fileName: '중2_국어_2단원.pdf',
-    status: 'done',
-    failedPages: 0,
-    request: {
-      accountId: 'kblib02',
-      accountAlias: '수학 담당',
-      orgName: '한국점자도서관',
-      requestedAt: '2026-08-12 16:41:02',
-      ip: '210.94.xxx.118',
-      location: '서울',
-      userAgent: 'Windows 11 · Chrome 141',
     },
-    processing: {
-      pages: 28,
-      successPages: 28,
-      failedPages: 0,
-      durationSec: 252,
-      secPerPage: 9.0,
-      cost: 896,
-      costPerPage: 32,
-      credit: 28,
-      layout: { text: 24, table: 2, formula: 0, image: 2 },
-    },
-    pageResults: [
-      { range: '1~24', layout: 'text', layoutLabel: '본문', cost: 528, status: 'done', reason: null },
-      { range: '25~26', layout: 'table', layoutLabel: '표', cost: 116, status: 'done', reason: null },
-      { range: '27~28', layout: 'image', layoutLabel: '그림', cost: 252, status: 'done', reason: null },
-    ],
+    pages: pageResults(),
   },
 }
 
-/* ─────────────── T1-5 ─────────────── */
+/* ─────────────── T1-5 · 변환 결과 미리보기 ─────────────── */
 
-export const jobPreviews: Record<string, T.JobPreview> = {
-  'job-1043': {
-    jobId: 'job-1043',
-    source: {
-      fileName: '수능특강_생명II.pdf',
-      pages: 14,
-      page: 8,
-      blocks: [
-        { kind: 'heading', text: '3. 매질에 따른 굴절률' },
-        { kind: 'paragraph', lines: 2 },
-        {
-          kind: 'table',
-          head: ['매질', '굴절률'],
-          rows: [
-            ['공기', '1.00'],
-            ['물', '1.33'],
-          ],
-        },
-        { kind: 'paragraph', lines: 1 },
-      ],
-    },
-    result: {
-      fileName: '수능특강_생명II.brf',
-      format: 'BRF',
-      content: [
-        '⠼⠉⠲⠀⠑⠗⠨⠊⠝⠀⠞⠕⠛⠮⠀⠈⠍⠨⠎⠞',
-        '⠿⠛⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠛⠿',
-        '⠿⠀⠑⠗⠨⠊⠀⠀⠈⠍⠨⠎⠞⠀⠀⠀⠿',
-        '⠿⠀⠨⠕⠈⠍⠀⠀⠼⠁⠲⠚⠚⠀⠀⠿',
-        '⠿⠀⠑⠥⠀⠀⠀⠼⠁⠲⠉⠉⠀⠀⠿',
-        '⠿⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠿',
-      ].join('\n'),
-    },
+const BRAILLE = [
+  '⠼⠉⠲⠀⠑⠗⠨⠊⠝⠀⠞⠕⠛⠮⠀⠈⠍⠨⠎⠞',
+  '⠿⠛⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠛⠿',
+  '⠿⠀⠑⠗⠨⠊⠀⠀⠈⠍⠨⠎⠞⠀⠀⠀⠿',
+  '⠿⠀⠨⠕⠈⠍⠀⠀⠼⠁⠲⠚⠚⠀⠀⠿',
+  '⠿⠀⠑⠥⠀⠀⠀⠼⠁⠲⠉⠉⠀⠀⠿',
+  '⠿⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠿',
+]
+
+const SOURCE_LINES = [
+  '3. 매질에 따른 굴절률',
+  '',
+  '┌────────┬────────┐',
+  '│  매질  │ 굴절률 │',
+  '├────────┼────────┤',
+  '│  공기  │  1.00  │',
+  '│   물   │  1.33  │',
+  '└────────┴────────┘',
+]
+
+/** 목업에는 S3 원본이 없어 원본을 글줄로 대신합니다(실제 a·c 모드는 presigned PDF). */
+export const jobPage: T.JobPageView = {
+  jobId: 'job-4003',
+  mode: 'c',
+  status: 'COMPLETED',
+  totalPages: 14,
+  originalFileName: '수능특강_생명II.pdf',
+  pageNo: 8,
+  result: {
+    braille_text_list: BRAILLE.map((contents, index) => ({ id: index + 1, contents })),
   },
+  original: { type: 'text', url: null, lines: SOURCE_LINES },
 }
 
-/* ─────────────── T1-6 ─────────────── */
+/* ─────────────── T1-6 · 기관 · 계정 ─────────────── */
 
 export const adminOrgs: T.AdminOrgRow[] = [
   {
-    id: 'org-kblib',
+    orgId: 'org-kblib',
     name: '한국점자도서관',
     code: 'kblib',
-    contractType: 'paid',
+    contractType: 'BASIC',
     accounts: [
       {
-        id: 'acc-kblib01',
-        accountId: 'kblib01',
-        alias: null,
-        status: 'active',
-        lastLoginAt: '오늘 09:12',
-        monthUsage: 820,
+        loginId: 'kblib01',
+        alias: '관리자',
+        role: 'ROLE_ORG_ADMIN',
+        status: 'ACTIVE',
+        lastLoginAt: at(0, 9, 12),
+        monthCredits: 820,
       },
       {
-        id: 'acc-kblib02',
-        accountId: 'kblib02',
+        loginId: 'kblib02',
         alias: '수학 담당',
-        status: 'active',
-        lastLoginAt: '어제',
-        monthUsage: 1140,
+        role: 'ROLE_USER',
+        status: 'ACTIVE',
+        lastLoginAt: at(1, 14, 5),
+        monthCredits: 1_140,
       },
     ],
-    subtotal: { accountCount: 2, lastLoginAt: '오늘 09:12', monthUsage: 1960 },
+    subtotal: { accountCount: 2, monthCredits: 1_960, adminLastLoginAt: at(0, 9, 12) },
   },
   {
-    id: 'org-snsb',
+    orgId: 'org-snsb',
     name: '서울맹학교',
     code: 'snsb',
-    contractType: 'paid',
+    contractType: 'STANDARD',
     accounts: [
       {
-        id: 'acc-snsb01',
-        accountId: 'snsb01',
-        alias: null,
-        status: 'active',
-        lastLoginAt: '오늘 11:40',
-        monthUsage: 1870,
+        loginId: 'snsb01',
+        alias: '관리자',
+        role: 'ROLE_ORG_ADMIN',
+        status: 'ACTIVE',
+        lastLoginAt: at(0, 11, 40),
+        monthCredits: 1_870,
       },
     ],
-    subtotal: { accountCount: 1, lastLoginAt: '오늘 11:40', monthUsage: 1870 },
+    subtotal: { accountCount: 1, monthCredits: 1_870, adminLastLoginAt: at(0, 11, 40) },
+  },
+  {
+    orgId: 'org-pub',
+    name: 'OO출판사',
+    code: 'oopub',
+    contractType: 'COUPON',
+    accounts: [
+      {
+        loginId: 'oopub01',
+        alias: null,
+        role: 'ROLE_ORG_ADMIN',
+        status: 'INACTIVE',
+        lastLoginAt: at(28, 15, 10),
+        monthCredits: 0,
+      },
+    ],
+    subtotal: { accountCount: 1, monthCredits: 0, adminLastLoginAt: at(28, 15, 10) },
   },
 ]
 
-/* ─────────────── T1-7 ─────────────── */
+/* ─────────────── T1-7 · 기관 정보 ─────────────── */
 
 export const orgDetails: Record<string, T.OrgDetail> = {
   'org-kblib': {
-    id: 'org-kblib',
+    orgId: 'org-kblib',
     name: '한국점자도서관',
     code: 'kblib',
-    contractType: 'paid',
-    contractStart: '2026-02-24',
-    contractEnd: '2026-08-24',
-    accountIds: ['kblib01', 'kblib02'],
-    credit: { used: 1960, total: 10000, rate: 20, expectedDepletion: '9월 중순' },
-    orders: [
-      { id: 'ord-1', date: '02-24', description: '연간 10,000', amount: 2400000, paidAt: '03-02' },
-      { id: 'ord-2', date: '06-02', description: '추가 3,000', amount: 780000, paidAt: null },
-    ],
-    coupons: [
-      { id: 'cpn-1', name: 'PoC 체험', credit: 1000, startAt: '08-01', endAt: '31', used: 820 },
+    contractType: 'BASIC',
+    contractStartedAt: '2026-02-24',
+    contractExpiresAt: '2026-08-24',
+    creditAllocated: 10_000,
+    creditUsed: 1_960,
+    creditRemaining: 8_040,
+    receiptEmail: 'account@kblib.or.kr',
+    accounts: [
+      { loginId: 'kblib01', alias: '관리자', role: 'ROLE_ORG_ADMIN', status: 'ACTIVE' },
+      { loginId: 'kblib02', alias: '수학 담당', role: 'ROLE_USER', status: 'ACTIVE' },
     ],
   },
   'org-snsb': {
-    id: 'org-snsb',
+    orgId: 'org-snsb',
     name: '서울맹학교',
     code: 'snsb',
-    contractType: 'paid',
-    contractStart: '2026-03-02',
-    contractEnd: '2027-03-01',
-    accountIds: ['snsb01'],
-    credit: { used: 1870, total: 6000, rate: 31, expectedDepletion: '11월 초' },
-    orders: [
-      { id: 'ord-3', date: '03-02', description: '연간 6,000', amount: 1440000, paidAt: '03-09' },
-    ],
-    coupons: [],
+    contractType: 'STANDARD',
+    contractStartedAt: '2026-03-02',
+    contractExpiresAt: '2027-03-01',
+    creditAllocated: 6_000,
+    creditUsed: 1_870,
+    creditRemaining: 4_130,
+    receiptEmail: null,
+    accounts: [{ loginId: 'snsb01', alias: '관리자', role: 'ROLE_ORG_ADMIN', status: 'ACTIVE' }],
+  },
+  'org-pub': {
+    orgId: 'org-pub',
+    name: 'OO출판사',
+    code: 'oopub',
+    contractType: 'COUPON',
+    contractStartedAt: '2026-08-01',
+    contractExpiresAt: '2026-08-31',
+    creditAllocated: 0,
+    creditUsed: 0,
+    creditRemaining: 0,
+    receiptEmail: null,
+    accounts: [{ loginId: 'oopub01', alias: null, role: 'ROLE_ORG_ADMIN', status: 'INACTIVE' }],
   },
 }
 
-/* ─────────────── T1-8 ─────────────── */
+export const coupons: Record<string, T.Coupon[]> = {
+  'org-kblib': [
+    {
+      id: 'coupon-1',
+      name: 'PoC 체험',
+      creditAmount: 1_000,
+      used: 820,
+      remaining: 180,
+      startsOn: `${THIS_MONTH}-01`,
+      endsOn: `${THIS_MONTH}-31`,
+      displayStatus: 'ACTIVE',
+    },
+  ],
+  'org-snsb': [],
+  'org-pub': [
+    {
+      id: 'coupon-2',
+      name: '도입 검토용',
+      creditAmount: 500,
+      used: 500,
+      remaining: 0,
+      startsOn: `${THIS_MONTH}-01`,
+      endsOn: `${THIS_MONTH}-31`,
+      displayStatus: 'EXHAUSTED',
+    },
+  ],
+}
 
-export const adminAccountDetails: Record<string, T.AdminAccountDetail> = {
-  'acc-kblib02': {
-    id: 'acc-kblib02',
-    accountId: 'kblib02',
-    alias: '수학 담당',
-    orgId: 'org-kblib',
+export const orders: T.Order[] = [
+  {
+    id: 'order-1',
+    organizationId: 'org-kblib',
     orgName: '한국점자도서관',
-    orgCode: 'kblib',
-    orgCredit: { used: 1960, total: 10000, rate: 20 },
-    accountCredit: { used: 1140, total: 10000, rate: 11 },
+    orderDate: '2026-02-24',
+    description: '연간 계약 · 10,000 크레딧',
+    amountKrw: 2_400_000,
+    creditAmount: 10_000,
+    paidAt: '2026-03-02',
+    invoiceStatus: 'ISSUED',
+    receiptFileName: '계산서_2월.pdf',
   },
-  'acc-kblib01': {
-    id: 'acc-kblib01',
-    accountId: 'kblib01',
-    alias: null,
-    orgId: 'org-kblib',
+  {
+    id: 'order-2',
+    organizationId: 'org-kblib',
     orgName: '한국점자도서관',
-    orgCode: 'kblib',
-    orgCredit: { used: 1960, total: 10000, rate: 20 },
-    accountCredit: { used: 820, total: 10000, rate: 8 },
+    orderDate: '2026-06-02',
+    description: '크레딧 추가 · 3,000',
+    amountKrw: 780_000,
+    creditAmount: 3_000,
+    paidAt: null,
+    invoiceStatus: 'PENDING',
+    receiptFileName: null,
   },
-  'acc-snsb01': {
-    id: 'acc-snsb01',
-    accountId: 'snsb01',
-    alias: null,
-    orgId: 'org-snsb',
+  {
+    id: 'order-3',
+    organizationId: 'org-snsb',
     orgName: '서울맹학교',
-    orgCode: 'snsb',
-    orgCredit: { used: 1870, total: 6000, rate: 31 },
-    accountCredit: { used: 1870, total: 6000, rate: 31 },
+    orderDate: '2026-03-02',
+    description: '연간 계약 · 6,000 크레딧',
+    amountKrw: 1_440_000,
+    creditAmount: 6_000,
+    paidAt: '2026-03-05',
+    invoiceStatus: 'ISSUED',
+    receiptFileName: null,
   },
-}
+]
 
-/* ─────────────── T1-9 ─────────────── */
+/* ─────────────── T1-9 · 문의 ─────────────── */
 
 export const inquiries: T.Inquiry[] = [
   {
     id: 'inq-1',
-    createdAt: '08-13 09:40',
-    sender: { orgName: '서울맹학교', accountId: 'snsb01', unregistered: false },
-    type: 'error',
-    typeLabel: '오류 신고',
-    status: 'unanswered',
-    elapsed: { text: '9시간', overdue: true },
+    type: 'ERROR_REPORT',
+    status: 'OPEN',
+    orgName: '서울맹학교',
+    loginId: 'snsb01',
+    message: '표가 들어간 쪽에서 변환이 자꾸 실패합니다. 확인 부탁드립니다.',
+    senderEmail: null,
+    subject: null,
+    createdAt: hoursAgo(9),
+    statusChangedAt: null,
   },
   {
     id: 'inq-2',
-    createdAt: '08-12 16:02',
-    sender: { orgName: 'OO출판사', accountId: null, unregistered: true },
-    type: 'sales',
-    typeLabel: '도입 문의',
-    status: 'checking',
-    elapsed: { text: '1일 2시간', overdue: false },
+    type: 'ONBOARDING',
+    status: 'IN_REVIEW',
+    orgName: null,
+    loginId: null,
+    message: '점자 교재 제작 도입을 검토 중입니다. 견적을 받아볼 수 있을까요?',
+    senderEmail: 'contact@oopub.co.kr',
+    subject: 'OO출판사',
+    createdAt: hoursAgo(26),
+    statusChangedAt: hoursAgo(20),
   },
   {
     id: 'inq-3',
-    createdAt: '08-11 11:15',
-    sender: { orgName: '한국점자도서관', accountId: 'kblib01', unregistered: false },
-    type: 'creditRequest',
-    typeLabel: '크레딧 추가',
-    status: 'answered',
-    elapsed: { text: '4시간 만에', overdue: false },
+    type: 'CREDIT_ADD',
+    status: 'ANSWERED',
+    orgName: '한국점자도서관',
+    loginId: 'kblib01',
+    message: '3,000 크레딧 추가 요청드립니다.',
+    senderEmail: null,
+    subject: null,
+    createdAt: hoursAgo(52),
+    statusChangedAt: hoursAgo(48),
   },
 ]
 
-export const inquiryBodies: Record<string, { title: string; body: string }> = {
-  'inq-1': {
-    title: '표가 포함된 쪽에서 변환이 멈춥니다',
-    body: '수능특강 지구과학 22쪽 파일을 올렸는데 12쪽에서 더 진행되지 않습니다. 확인 부탁드립니다.',
-  },
-  'inq-2': {
-    title: '도입 절차와 견적을 알고 싶습니다',
-    body: '출판사에서 점자 도서 제작을 검토 중입니다. 계약 단가와 체험 가능 여부를 알려주세요.',
-  },
-  'inq-3': {
-    title: '크레딧 3,000 추가 요청',
-    body: '하반기 물량이 늘어 크레딧 추가가 필요합니다. 견적서 발행 부탁드립니다.',
-  },
-}
-
-/* ─────────────── T1-10 ─────────────── */
+/* ─────────────── T1-10 · 공지 ─────────────── */
 
 export const notices: T.Notice[] = [
   {
-    id: 'ntc-1',
-    createdAt: '08-13',
-    scope: 'org',
-    orgId: 'org-kblib',
-    orgName: '한국점자도서관',
+    id: 'notice-1',
+    targetOrganizationId: 'org-kblib',
+    targetOrgName: '한국점자도서관',
     title: '크레딧 소진 임박 안내',
-    body: '할당 크레딧의 80%를 사용했습니다. 추가 계약이 필요하면 문의로 알려주세요.',
-    startAt: '08-13',
-    endAt: '08-31',
-    state: 'live',
+    body: '이번 달 사용량이 빨라 9월 중순 소진이 예상됩니다. 추가 크레딧이 필요하면 알려 주세요.',
+    startsOn: at(1, 0, 0).slice(0, 10),
+    endsOn: at(-6, 0, 0).slice(0, 10),
+    displayStatus: 'ACTIVE',
+    createdAt: at(1, 9, 0),
   },
   {
-    id: 'ntc-2',
-    createdAt: '08-12',
-    scope: 'all',
-    orgId: null,
-    orgName: null,
+    id: 'notice-2',
+    targetOrganizationId: null,
+    targetOrgName: null,
     title: '8/15 새벽 서버 점검',
-    body: '8월 15일 02:00~05:00 서버 점검이 있습니다. 해당 시간에는 변환이 중단됩니다.',
-    startAt: '08-12',
-    endAt: '08-16',
-    state: 'live',
+    body: '02:00~03:00 점검으로 서비스가 잠시 중단됩니다.',
+    startsOn: at(2, 0, 0).slice(0, 10),
+    endsOn: at(-4, 0, 0).slice(0, 10),
+    displayStatus: 'ACTIVE',
+    createdAt: at(2, 11, 0),
   },
   {
-    id: 'ntc-3',
-    createdAt: '07-30',
-    scope: 'all',
-    orgId: null,
-    orgName: null,
+    id: 'notice-3',
+    targetOrganizationId: null,
+    targetOrgName: null,
     title: '7월 업데이트 안내',
-    body: '표 인식 정확도가 개선되었습니다.',
-    startAt: '07-30',
-    endAt: '08-06',
-    state: 'ended',
+    body: '표 인식 정확도를 개선했습니다.',
+    startsOn: at(30, 0, 0).slice(0, 10),
+    endsOn: at(23, 0, 0).slice(0, 10),
+    displayStatus: 'ENDED',
+    createdAt: at(30, 10, 0),
   },
 ]
 
-/* ─────────────── T2 ─────────────── */
+/* ─────────────── T2 · 기관 관리 ─────────────── */
 
-export const orgSummary: T.OrgSummary = {
-  orgId: 'org-kblib',
+export const orgDashboard: T.OrgDashboard = {
   orgName: '한국점자도서관',
-  credit: { used: 4600, total: 10000, rate: 46, remaining: 5400, expectedDepletion: '9월 중순' },
-  contract: { startAt: '2026-02-24', endAt: '2026-08-24', daysLeft: 11 },
+  orgCode: 'kblib',
+  contractType: 'BASIC',
+  contractStartedAt: '2026-02-24',
+  contractExpiresAt: '2026-08-24',
+  creditAllocated: 10_000,
+  creditUsed: 4_600,
+  creditRemaining: 5_400,
+  monthlyUsage: Array.from({ length: 6 }, (_, index) => {
+    const date = new Date(today.getFullYear(), today.getMonth() - (5 - index), 1)
+    return {
+      month: `${date.getFullYear()}-${pad(date.getMonth() + 1)}`,
+      credits: [2_100, 2_600, 3_100, 2_800, 3_900, 4_600][index],
+    }
+  }),
 }
-
-export const orgMonthlyUsage: T.OrgMonthlyUsage = {
-  points: [
-    { label: '3월', credit: 2100 },
-    { label: '4월', credit: 2600 },
-    { label: '5월', credit: 3100 },
-    { label: '6월', credit: 2800 },
-    { label: '7월', credit: 3900 },
-    { label: '8월', credit: 4600 },
-  ],
-  average: 3183,
-}
-
-export const orgNotices: T.OrgNotice[] = [
-  {
-    id: 'ntc-1',
-    receivedAt: '08-13',
-    scope: 'org',
-    title: '크레딧 소진 임박 안내',
-    body: '할당 크레딧의 80%를 사용했습니다. 추가 계약이 필요하면 문의로 알려주세요.',
-  },
-  {
-    id: 'ntc-2',
-    receivedAt: '08-12',
-    scope: 'all',
-    title: '8/15 새벽 서버 점검',
-    body: '8월 15일 02:00~05:00 서버 점검이 있습니다. 해당 시간에는 변환이 중단됩니다.',
-  },
-]
 
 export const orgAccounts: T.OrgAccountRow[] = [
   {
-    id: 'acc-kblib01',
-    accountId: 'kblib01',
+    loginId: 'kblib01',
     alias: '관리자',
-    status: 'active',
-    lastLoginAt: '오늘 09:12',
-    usage: 820,
-    requestedAt: null,
+    status: 'ACTIVE',
+    role: 'ROLE_ORG_ADMIN',
+    lastLoginAt: at(0, 9, 12),
+    monthCredits: 820,
     self: true,
-    orgAdmin: true,
   },
   {
-    id: 'acc-kblib02',
-    accountId: 'kblib02',
+    loginId: 'kblib02',
     alias: '수학 담당',
-    status: 'active',
-    lastLoginAt: '어제',
-    usage: 1140,
-    requestedAt: null,
+    status: 'ACTIVE',
+    role: 'ROLE_USER',
+    lastLoginAt: at(1, 14, 5),
+    monthCredits: 1_140,
     self: false,
-    orgAdmin: false,
   },
   {
-    id: 'acc-kblib03',
-    accountId: 'kblib03',
+    loginId: 'kblib03',
     alias: null,
-    status: 'locked',
-    lastLoginAt: '07-22',
-    usage: 0,
-    requestedAt: null,
+    status: 'INACTIVE',
+    role: 'ROLE_USER',
+    lastLoginAt: at(22, 10, 30),
+    monthCredits: 0,
     self: false,
-    orgAdmin: false,
-  },
-  {
-    id: 'req-1',
-    accountId: null,
-    alias: '국어 담당',
-    status: 'requested',
-    lastLoginAt: null,
-    usage: null,
-    requestedAt: '08-12 요청',
-    self: false,
-    orgAdmin: false,
   },
 ]
 
-export const orgOrders: T.OrgOrderList = {
-  items: [
-    {
-      id: 'ord-1',
-      date: '2026-02-24',
-      description: '연간 계약 · 10,000 크레딧',
-      amount: 2400000,
-      payment: 'paid',
-      invoice: 'issued',
-      receiptUrl: '#',
-    },
-    {
-      id: 'ord-2',
-      date: '2026-06-02',
-      description: '크레딧 추가 · 3,000',
-      amount: 780000,
-      payment: 'unpaid',
-      invoice: 'pending',
-      receiptUrl: null,
-    },
-  ],
-  billingEmail: 'account@kblib.or.kr',
-}
+export const orgRequests: T.OrgRequest[] = [
+  {
+    id: 'req-1',
+    type: 'ACCOUNT_ISSUE',
+    status: 'OPEN',
+    message: '국어 담당 계정 1개 발급 요청드립니다.',
+    createdAt: at(7, 10, 20),
+  },
+]
 
-/* ─────────────── T2-2 ─────────────── */
+export const orgNotices: T.OrgNotice[] = [
+  {
+    id: 'notice-1',
+    scope: 'ORG',
+    title: '크레딧 소진 임박 안내',
+    body: '이번 달 사용량이 빨라 9월 중순 소진이 예상됩니다. 추가 크레딧이 필요하면 알려 주세요.',
+    startsOn: at(1, 0, 0).slice(0, 10),
+    endsOn: at(-6, 0, 0).slice(0, 10),
+    createdAt: at(1, 9, 0),
+  },
+  {
+    id: 'notice-2',
+    scope: 'ALL',
+    title: '8/15 새벽 서버 점검',
+    body: '02:00~03:00 점검으로 서비스가 잠시 중단됩니다.',
+    startsOn: at(2, 0, 0).slice(0, 10),
+    endsOn: at(-4, 0, 0).slice(0, 10),
+    createdAt: at(2, 11, 0),
+  },
+]
 
-export const orgAccountDetails: Record<string, T.OrgAccountDetail> = {
-  'acc-kblib02': {
-    id: 'acc-kblib02',
-    accountId: 'kblib02',
+/* ─────────────── T2-2 · 계정 상세 ─────────────── */
+
+export const orgAccountJobs: Record<string, T.OrgAccountJobs> = {
+  kblib02: {
+    loginId: 'kblib02',
     alias: '수학 담당',
-    orgName: '한국점자도서관',
-    credit: { used: 1140, total: 10000, rate: 11 },
-    range: { from: '2026-07-01', to: '2026-08-13' },
-    jobs: [
+    from: at(43, 0, 0).slice(0, 10),
+    to: at(0, 0, 0).slice(0, 10),
+    items: [
       {
-        id: 'job-1043',
+        jobId: 'job-4003',
         fileName: '수능특강_생명II.pdf',
-        status: 'partialFailed',
+        mode: 'c',
+        status: 'COMPLETED',
+        totalPages: 14,
+        donePages: null,
         failedPages: 3,
-        pages: 14,
-        credit: 11,
-        completedAt: '08-13',
+        credits: 11,
+        startedAt: at(0, 10, 22, 14),
+        finishedAt: at(0, 10, 24, 25),
       },
       {
-        id: 'job-1044',
+        jobId: 'job-4004',
         fileName: '중2_국어_2단원.pdf',
-        status: 'done',
-        pages: 28,
-        credit: 28,
-        completedAt: '08-12',
+        mode: 'b',
+        status: 'COMPLETED',
+        totalPages: 28,
+        donePages: null,
+        failedPages: null,
+        credits: 28,
+        startedAt: at(1, 16, 58),
+        finishedAt: at(1, 17, 2, 12),
       },
       {
-        id: 'job-1045',
+        jobId: 'job-4005',
         fileName: '모의고사_수학.pdf',
-        status: 'processing',
-        processedPages: 20,
-        pages: 36,
-        credit: null,
-        completedAt: null,
+        mode: 'c',
+        status: 'IN_PROGRESS',
+        totalPages: 36,
+        donePages: 20,
+        failedPages: null,
+        credits: null,
+        startedAt: hoursAgo(0.4),
+        finishedAt: null,
       },
     ],
-    total: { pages: 78, credit: 39 },
-  },
-  'acc-kblib01': {
-    id: 'acc-kblib01',
-    accountId: 'kblib01',
-    alias: '관리자',
-    orgName: '한국점자도서관',
-    credit: { used: 820, total: 10000, rate: 8 },
-    range: { from: '2026-07-01', to: '2026-08-13' },
-    jobs: [
-      {
-        id: 'job-1041',
-        fileName: '모의고사_국어.pdf',
-        status: 'uploaded',
-        pages: 8,
-        credit: null,
-        completedAt: null,
-      },
-    ],
-    total: { pages: 8, credit: 0 },
-  },
-  'acc-kblib03': {
-    id: 'acc-kblib03',
-    accountId: 'kblib03',
-    alias: null,
-    orgName: '한국점자도서관',
-    credit: { used: 0, total: 10000, rate: 0 },
-    range: { from: '2026-07-01', to: '2026-08-13' },
-    jobs: [],
-    total: { pages: 0, credit: 0 },
+    totalPages: 78,
+    totalCredits: 39,
   },
 }

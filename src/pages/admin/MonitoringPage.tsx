@@ -1,35 +1,65 @@
 import { useState } from 'react'
-import { api } from '@/api'
-import type { JobStatus } from '@/api/types'
+import type { JobStatusFilter, JobSummary } from '@/api/types'
 import { MONITORING_REFETCH_MS, useJobs } from '@/api/queries'
 import { Badge, Card, Query } from '@/components/ui'
 import { useToast } from '@/components/Toast'
-import { downloadBlob, duration, jobStatusText, jobStatusTone, number, won } from '@/lib/format'
+import { toCsvBlob } from '@/lib/csv'
+import {
+  dateTime,
+  downloadBlob,
+  duration,
+  elapsedSec,
+  jobStatusText,
+  jobStatusTone,
+  number,
+  won,
+} from '@/lib/format'
 import { openWindow } from '@/lib/openWindow'
 
 const STATUS_OPTIONS = [
   { value: 'all', label: '전체 상태' },
-  { value: 'uploaded', label: '업로드' },
-  { value: 'processing', label: '진행 중' },
-  { value: 'done', label: '완료' },
-  { value: 'partialFailed', label: '부분 실패' },
-] as const
+  { value: 'PENDING', label: '업로드' },
+  { value: 'IN_PROGRESS', label: '진행 중' },
+  { value: 'COMPLETED', label: '완료' },
+  { value: 'FAILED', label: '실패' },
+] as const satisfies ReadonlyArray<{ value: JobStatusFilter; label: string }>
+
+const STATUS_FILE_NAME: Record<JobStatusFilter, string> = {
+  all: '전체',
+  PENDING: '업로드',
+  IN_PROGRESS: '진행중',
+  COMPLETED: '완료',
+  FAILED: '실패',
+}
 
 /**
- * T1-3 · 실시간 모니터링 (탭)
+ * AD-T1-3 · 실시간 모니터링 (탭)
  *
- * 기획서: 지금 서버에서 벌어지는 일을 봅니다. 10초마다 값이 갱신됩니다.
- * 계정 아이디는 빼고 기관만 둡니다. 목록에는 재시도 버튼을 두지 않습니다.
+ * GET /api/admin/jobs — 10초마다 다시 부릅니다.
+ * 계정 아이디는 빼고 기관만 둡니다. 목록에는 재시도 버튼을 두지 않습니다(명세 확정).
  */
 export function MonitoringPage() {
-  const [status, setStatus] = useState<JobStatus | 'all'>('all')
+  const [status, setStatus] = useState<JobStatusFilter>('all')
   const jobs = useJobs(status)
   const toast = useToast()
 
-  const exportCsv = async () => {
-    // 화면에 걸린 필터 그대로 내려받습니다. (기획서 §6)
-    const blob = await api.admin.exportJobsCsv({ status })
-    downloadBlob(blob, `모니터링_${status}.csv`)
+  /** CSV 는 화면이 만듭니다 — 지금 걸린 필터 그대로. (명세: BE 엔드포인트 없음) */
+  const exportCsv = (items: JobSummary[]) => {
+    const blob = toCsvBlob(
+      ['작업명', '기관', '계정', '쪽수', '소요(초)', '원가(원)', '상태', '요청 시각', '완료 시각'],
+      items.map((job) => [
+        job.fileName,
+        job.orgName ?? '',
+        job.loginId ?? '',
+        job.totalPages,
+        elapsedSec(job.startedAt, job.finishedAt) ?? '',
+        job.costKrw === null ? '' : Math.round(job.costKrw),
+        jobStatusText(job),
+        dateTime(job.startedAt),
+        dateTime(job.finishedAt),
+      ]),
+    )
+    downloadBlob(blob, `모니터링_${STATUS_FILE_NAME[status]}.csv`)
     toast('CSV 를 내려받았습니다.')
   }
 
@@ -43,7 +73,8 @@ export function MonitoringPage() {
             className="select"
             style={{ width: 'auto' }}
             value={status}
-            onChange={(e) => setStatus(e.target.value as JobStatus | 'all')}
+            onChange={(event) => setStatus(event.target.value as JobStatusFilter)}
+            aria-label="상태 필터"
           >
             {STATUS_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -51,7 +82,12 @@ export function MonitoringPage() {
               </option>
             ))}
           </select>
-          <button type="button" className="btn" onClick={exportCsv}>
+          <button
+            type="button"
+            className="btn"
+            disabled={!jobs.data?.items.length}
+            onClick={() => exportCsv(jobs.data?.items ?? [])}
+          >
             CSV
           </button>
         </>
@@ -73,37 +109,44 @@ export function MonitoringPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.items.map((job) => (
-                  <tr key={job.id}>
-                    <td>{job.fileName}</td>
-                    <td>{job.orgName}</td>
-                    <td className="table__num">{number(job.pages)}</td>
-                    {/* 진행 중이면 소요·원가는 —. 끝나야 확정됩니다. (기획서 §6) */}
-                    <td className="table__num">
-                      {job.durationSec === null ? <span className="dash">—</span> : duration(job.durationSec)}
-                    </td>
-                    <td className="table__num">
-                      {job.cost === null ? <span className="dash">—</span> : won(job.cost)}
-                    </td>
-                    <td>
-                      <Badge tone={jobStatusTone(job.status)}>{jobStatusText(job)}</Badge>
-                    </td>
-                    <td className="table__actions">
-                      <button
-                        type="button"
-                        className="btn btn--sm"
-                        onClick={() => openWindow(`/admin/jobs/${job.id}`, `job-${job.id}`)}
-                      >
-                        상세 보기
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {data.items.map((job) => {
+                  const sec = elapsedSec(job.startedAt, job.finishedAt)
+                  return (
+                    <tr key={job.jobId}>
+                      <td>{job.fileName}</td>
+                      <td className={job.orgName ? '' : 'dash'}>{job.orgName ?? '—'}</td>
+                      <td className="table__num">{number(job.totalPages)}</td>
+                      {/* 진행 중이면 소요·원가는 —. 끝나야 확정됩니다. (명세 §T1-3) */}
+                      <td className="table__num">
+                        {sec === null ? <span className="dash">—</span> : duration(sec)}
+                      </td>
+                      <td className="table__num">
+                        {job.costKrw === null ? <span className="dash">—</span> : won(job.costKrw)}
+                      </td>
+                      <td>
+                        <Badge tone={jobStatusTone(job)}>{jobStatusText(job)}</Badge>
+                      </td>
+                      <td className="table__actions">
+                        <button
+                          type="button"
+                          className="btn btn--sm"
+                          onClick={() => openWindow(`/admin/jobs/${job.jobId}`, `job-${job.jobId}`)}
+                        >
+                          상세 보기
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
         )}
       </Query>
+
+      <p className="card__note">
+        기관만 표시(계정은 상세에서) · 상태는 업로드/진행 중/완료/부분 실패 · 목록에 재시도 버튼 없음
+      </p>
     </Card>
   )
 }

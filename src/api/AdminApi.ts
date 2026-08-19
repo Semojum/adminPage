@@ -1,150 +1,162 @@
 import type {
-  AdminAccountDetail,
-  AdminOrgRow,
-  Bucket,
-  CostSummary,
+  AdminOrgList,
+  Coupon,
   CreateAccountInput,
   CreateNoticeInput,
+  CreateOrderInput,
   CreateOrgInput,
+  CreatedOrg,
   Inquiry,
-  InquiryDetail,
   InquiryStatus,
   InquiryType,
   IssueCouponInput,
+  IssuedCredential,
   JobDetail,
-  JobPreview,
-  JobStatus,
-  JobSummary,
-  JobVolumePoint,
-  LayoutCostRow,
-  ListResponse,
+  JobList,
+  JobPageView,
+  JobStatusFilter,
+  LayoutCostReport,
   LoginInput,
   Notice,
-  OrgAccountDetail,
+  Order,
+  OrgAccountJobs,
   OrgAccountList,
+  OrgDashboard,
   OrgDetail,
-  OrgMonthlyUsage,
   OrgNotice,
   OrgOrderList,
-  OrgProfitReport,
-  OrgSummary,
+  OrgRequest,
+  OrgRequestType,
   Period,
+  ProfitReport,
+  ReceiptLink,
+  Role,
   Session,
-  StatsSummary,
+  StatsOverview,
+  UpdateOrderInput,
+  UpdateOrgInput,
+  Workload,
 } from './types'
+import type { AccountStatus, Bucket } from './types'
 
 /**
- * 앱이 서버에 요구하는 것 전부.
+ * 앱이 서버에 요구하는 것 전부 — V3 API 명세(2026-08-19 판)의 관리자/기관 구간.
  *
  * 화면은 이 인터페이스만 봅니다. 구현은 두 벌입니다.
- *   - src/api/mock/mockApi.ts : 기획서 목업 값을 그대로 돌려줍니다 (현재 기본값)
- *   - src/api/http/httpApi.ts : 실제 서버를 호출합니다
+ *   - src/api/mock/mockApi.ts : 기획서 목업 값을 그대로 돌려줍니다
+ *   - src/api/http/httpApi.ts : 명세의 실제 엔드포인트를 호출합니다
  *
- * API 명세가 나오면 httpApi 의 경로·페이로드만 맞추고 VITE_API_SOURCE=http 로 바꾸면 됩니다.
- * 화면 코드는 손대지 않습니다.
+ * 메서드 이름 옆 주석이 실제 경로입니다. 명세가 바뀌면 httpApi 만 고칩니다.
  */
 export interface Api {
-  /**
-   * 세션 · 로그인.
-   *
-   * 기획서 §6 "권한별 진입 분리": 관리자 페이지는 앱과 다른 주소로 띄우고 서버에서도 막습니다.
-   * 그래서 진입점마다 로그인 호출을 따로 둡니다 — 어느 역할을 받는지가 서버 책임이 되도록.
-   */
   auth: {
-    /** 로그인하지 않았으면 null 을 돌려줍니다. */
+    /**
+     * 저장해 둔 토큰으로 세션을 복구합니다. 로그인 상태가 아니면 null.
+     * (명세에 세션 조회 API 가 없어 /api/auth/refresh 로 살아 있는지 확인합니다.)
+     */
     getSession(): Promise<Session | null>
-    /** 운영자 콘솔(T1). ROLE_ADMIN 만 받습니다. */
-    loginAdmin(input: LoginInput): Promise<Session>
-    /** 서비스 앱(T2 · T3). ROLE_ORG_ADMIN 과 ROLE_USER 를 받습니다. */
-    loginApp(input: LoginInput): Promise<Session>
+    /** POST /api/auth/login — 운영자·기관 관리자·점역사 공용. 역할 분기는 응답 role 로 합니다. */
+    login(input: LoginInput): Promise<Session>
+    /** POST /api/auth/logout */
     logout(): Promise<void>
   }
 
-  /* ── T1 · 운영자 콘솔 ── */
+  /* ── T1 · 운영자 콘솔 (Bearer ROLE_ADMIN) ── */
   admin: {
-    /** T1-1 전체 작업 현황 */
-    getStatsSummary(period: Period): Promise<StatsSummary>
-    /** T1-1 누적 원가 */
-    getCostSummary(period: Period): Promise<CostSummary>
+    /** GET /api/admin/stats/overview?period= */
+    getStatsOverview(period: Period): Promise<StatsOverview>
+    /** GET /api/admin/stats/workload?unit= */
+    getWorkload(unit: Bucket): Promise<Workload>
+    /** GET /api/admin/stats/layout-cost?month= */
+    getLayoutCost(month: string): Promise<LayoutCostReport>
+    /** GET /api/admin/stats/profitability?month= */
+    getProfitability(month: string): Promise<ProfitReport>
 
-    /** T1-2 작업량 */
-    getJobVolume(bucket: Bucket): Promise<ListResponse<JobVolumePoint>>
-    /** T1-2 레이아웃 유형별 평균 원가 (month: 'YYYY-MM') */
-    getLayoutCost(month: string): Promise<ListResponse<LayoutCostRow>>
-    /** T1-2 기관별 수익성 (month: 'YYYY-MM') */
-    getOrgProfit(month: string): Promise<OrgProfitReport>
-
-    /** T1-3 실시간 모니터링. 10초마다 다시 부릅니다. */
-    getJobs(params?: { status?: JobStatus | 'all' }): Promise<ListResponse<JobSummary>>
-    /** T1-3 CSV — 화면에 걸린 필터 그대로, UTF-8 BOM */
-    exportJobsCsv(params?: { status?: JobStatus | 'all' }): Promise<Blob>
-
-    /** T1-4 작업 상세 */
+    /** GET /api/admin/jobs — 10초마다 다시 부릅니다. */
+    getJobs(params?: { status?: JobStatusFilter; hours?: number; size?: number }): Promise<JobList>
+    /** GET /api/admin/jobs/{jobId} */
     getJob(jobId: string): Promise<JobDetail>
-    /** T1-4 CSV */
-    exportJobCsv(jobId: string): Promise<Blob>
+    /** GET /api/admin/jobs/{jobId}/pages/{pageNo} */
+    getJobPage(jobId: string, pageNo: number): Promise<JobPageView>
+    /** POST /api/admin/jobs/{jobId}/send-to-mypage — 대상은 ROLE_ADMIN 계정만 */
+    sendJobToMyPage(jobId: string, targetLoginId?: string): Promise<void>
 
-    /** T1-5 변환 결과 미리보기 */
-    getJobPreview(jobId: string, page?: number): Promise<JobPreview>
-    /** T1-5 운영자 계정 마이페이지로 사본 보내기 */
-    sendJobToMyPage(jobId: string): Promise<void>
-
-    /** T1-6 기관 및 계정 통합 표 */
-    getOrgs(): Promise<ListResponse<AdminOrgRow>>
-    createOrg(input: CreateOrgInput): Promise<AdminOrgRow>
-    deleteOrg(orgId: string): Promise<void>
-    /** 기관 관리자 비밀번호 재발급 */
-    resetOrgAdminPassword(orgId: string): Promise<void>
-
-    createAccount(input: CreateAccountInput): Promise<void>
-    deleteAccount(accountId: string): Promise<void>
-    resetAccountPassword(accountId: string): Promise<void>
-    /** 누르는 즉시 로그인이 끊기고 진행 중이던 변환도 멈춥니다. */
-    setAccountLocked(accountId: string, locked: boolean): Promise<void>
-
-    /** T1-7 기관 정보 */
+    /** GET /api/admin/orgs?month= */
+    getOrgs(month?: string): Promise<AdminOrgList>
+    /** POST /api/admin/orgs */
+    createOrg(input: CreateOrgInput): Promise<CreatedOrg>
+    /** GET /api/admin/orgs/{orgId} */
     getOrg(orgId: string): Promise<OrgDetail>
-    updateOrg(orgId: string, patch: Partial<CreateOrgInput>): Promise<OrgDetail>
-    /** 입금 확인 기록 */
-    recordOrderPayment(orgId: string, orderId: string, paidAt: string): Promise<void>
-    issueCoupon(orgId: string, input: IssueCouponInput): Promise<void>
+    /** PATCH /api/admin/orgs/{orgId} */
+    updateOrg(orgId: string, patch: UpdateOrgInput): Promise<OrgDetail>
+    /** DELETE /api/admin/orgs/{orgId} — 소프트 삭제. 소속 계정이 전부 잠깁니다. */
+    deleteOrg(orgId: string): Promise<void>
 
-    /** T1-8 계정 정보 (조회 전용) */
-    getAccount(accountId: string): Promise<AdminAccountDetail>
+    /** POST /api/admin/accounts — 비밀번호는 이 응답에서 한 번만 볼 수 있습니다. */
+    createAccounts(input: CreateAccountInput): Promise<IssuedCredential[]>
+    /** DELETE /api/admin/accounts/{loginId} */
+    deleteAccount(loginId: string): Promise<void>
+    /** POST /api/admin/accounts/{loginId}/password-reissue */
+    reissuePassword(loginId: string): Promise<IssuedCredential>
+    /** PATCH /api/admin/accounts/{loginId}/status — INACTIVE 는 즉시 세션을 끊습니다. */
+    setAccountStatus(loginId: string, status: AccountStatus): Promise<void>
+    /** PATCH /api/admin/accounts/{loginId}/role */
+    setAccountRole(loginId: string, role: Extract<Role, 'ROLE_ADMIN' | 'ROLE_USER'>): Promise<void>
 
-    /** T1-9 문의 */
-    getInquiries(params?: {
-      type?: InquiryType | 'all'
-      unansweredOnly?: boolean
-    }): Promise<ListResponse<Inquiry>>
-    getInquiry(inquiryId: string): Promise<InquiryDetail>
-    replyInquiry(inquiryId: string, body: string): Promise<void>
+    /** GET /api/admin/orgs/{orgId}/coupons */
+    getCoupons(orgId: string): Promise<Coupon[]>
+    /** POST /api/admin/orgs/{orgId}/coupons */
+    issueCoupon(orgId: string, input: IssueCouponInput): Promise<Coupon>
+
+    /** GET /api/admin/orders?organizationId= */
+    getOrders(organizationId?: string): Promise<Order[]>
+    /** POST /api/admin/orders */
+    createOrder(input: CreateOrderInput): Promise<Order>
+    /** PATCH /api/admin/orders/{orderId} — 입금·계산서 기록 */
+    updateOrder(orderId: string, patch: UpdateOrderInput): Promise<Order>
+    /** GET /api/admin/orders/{orderId}/receipt — presigned 15분 */
+    getOrderReceipt(orderId: string): Promise<ReceiptLink>
+
+    /** GET /api/admin/inquiries?status=&type= */
+    getInquiries(params?: { status?: InquiryStatus; type?: InquiryType }): Promise<Inquiry[]>
+    /** PATCH /api/admin/inquiries/{inquiryId}/status */
     setInquiryStatus(inquiryId: string, status: InquiryStatus): Promise<void>
 
-    /** T1-10 공지 */
-    getNotices(): Promise<ListResponse<Notice>>
+    /** GET /api/admin/notices */
+    getNotices(): Promise<Notice[]>
+    /** POST /api/admin/notices */
     createNotice(input: CreateNoticeInput): Promise<Notice>
   }
 
-  /* ── T2 · 기관 관리 (기관 관리자) ── */
+  /* ── T2 · 기관 관리 (Bearer ROLE_ORG_ADMIN) ── */
   org: {
-    getSummary(): Promise<OrgSummary>
-    getMonthlyUsage(): Promise<OrgMonthlyUsage>
-    getNotices(): Promise<ListResponse<OrgNotice>>
+    /** GET /api/org/dashboard */
+    getDashboard(): Promise<OrgDashboard>
 
-    getAccounts(): Promise<OrgAccountList>
-    updateAccountAlias(accountId: string, alias: string): Promise<void>
-    setAccountLocked(accountId: string, locked: boolean): Promise<void>
+    /** GET /api/org/accounts?month= */
+    getAccounts(month?: string): Promise<OrgAccountList>
+    /** PATCH /api/org/accounts/{loginId}/alias — 빈 값이면 별칭을 지웁니다. */
+    setAccountAlias(loginId: string, alias: string | null): Promise<void>
+    /** PATCH /api/org/accounts/{loginId}/lock — 잠금은 즉시 반영됩니다. */
+    setAccountLocked(loginId: string, locked: boolean): Promise<{ canceledJobs: number }>
+    /** GET /api/org/accounts/{loginId}/jobs?from=&to= */
+    getAccountJobs(loginId: string, range?: { from?: string; to?: string }): Promise<OrgAccountJobs>
 
-    /** 세모점 문의 목록(T1-9)으로 접수됩니다. */
-    requestCredit(input: { amount?: number; message?: string }): Promise<void>
-    requestAccount(input: { alias?: string }): Promise<void>
-    cancelAccountRequest(requestId: string): Promise<void>
+    /** GET /api/org/requests */
+    getRequests(): Promise<OrgRequest[]>
+    /** POST /api/org/requests — 세모점 문의 목록(T1-9)으로 들어갑니다. */
+    createRequest(input: { type: OrgRequestType; message?: string }): Promise<OrgRequest>
+    /** DELETE /api/org/requests/{requestId} — OPEN 상태에서만 */
+    cancelRequest(requestId: string): Promise<void>
 
+    /** GET /api/org/notices */
+    getNotices(): Promise<OrgNotice[]>
+
+    /** GET /api/org/orders */
     getOrders(): Promise<OrgOrderList>
-    updateBillingEmail(email: string): Promise<void>
-
-    /** T2-2 계정 상세 */
-    getAccountDetail(accountId: string, range?: { from: string; to: string }): Promise<OrgAccountDetail>
+    /** PATCH /api/org/receipt-email */
+    updateReceiptEmail(email: string | null): Promise<void>
+    /** GET /api/org/orders/{orderId}/receipt */
+    getOrderReceipt(orderId: string): Promise<ReceiptLink>
   }
 }

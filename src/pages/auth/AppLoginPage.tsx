@@ -11,11 +11,11 @@ import { LoginForm } from './LoginForm'
 export function AppLoginPage() {
   return (
     <LoginForm
-      entry="app"
       host="semo-jum.com"
       title="세모점 로그인"
       description="기관 관리자·점역사 계정으로 로그인합니다."
       destinations={{ ROLE_ORG_ADMIN: '/org' }}
+      footNote="비밀번호는 세모점이 발급합니다. 잊었으면 담당자에게 재발급을 요청해 주세요."
       demoRoles={['ROLE_ORG_ADMIN', 'ROLE_USER']}
       crossLink={
         isMockApi ? (

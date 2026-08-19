@@ -1,30 +1,25 @@
 import { useState } from 'react'
-import type { NoticeScope } from '@/api/types'
 import { useCreateNotice, useNotices, useOrgs } from '@/api/queries'
 import { Badge, Card, Query } from '@/components/ui'
 import { Modal } from '@/components/Modal'
 import { useToast } from '@/components/Toast'
-
-const STATE = {
-  live: { label: '노출 중', tone: 'ok' },
-  scheduled: { label: '예약', tone: 'info' },
-  ended: { label: '종료', tone: 'muted' },
-} as const
+import { noticeStatusLabel, noticeStatusTone, shortDate } from '@/lib/format'
 
 const EMPTY_FORM = {
-  scope: 'all' as NoticeScope,
+  scope: 'all' as 'all' | 'org',
   orgId: '',
-  startAt: '',
-  endAt: '',
+  startsOn: '',
+  endsOn: '',
   title: '',
   body: '',
 }
 
 /**
- * T1-10 · 공지 (탭)
+ * AD-T1-10 · 공지 (탭)
  *
- * 기획서: 점검과 변경 사항을 알립니다. 노출 기간이 지나면 자동으로 내려갑니다.
+ * POST·GET /api/admin/notices
  * 특정 기관을 고르면 그 기관 담당자 화면(T2)에만 뜹니다.
+ * 노출 기간이 지나면 자동으로 종료됩니다 — 서버가 조회 시점에 판정합니다(스케줄러 없음).
  */
 export function NoticePage() {
   const notices = useNotices()
@@ -35,15 +30,17 @@ export function NoticePage() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [previewOpen, setPreviewOpen] = useState(false)
 
-  const canSubmit = Boolean(form.title && form.startAt && form.endAt) && (form.scope === 'all' || form.orgId)
+  const canSubmit =
+    Boolean(form.title && form.startsOn && form.endsOn) &&
+    form.startsOn <= form.endsOn &&
+    (form.scope === 'all' || Boolean(form.orgId))
 
   const submit = () => {
     createNotice.mutate(
       {
-        scope: form.scope,
-        orgId: form.scope === 'org' ? form.orgId : undefined,
-        startAt: form.startAt,
-        endAt: form.endAt,
+        targetOrganizationId: form.scope === 'org' ? form.orgId : null,
+        startsOn: form.startsOn,
+        endsOn: form.endsOn,
         title: form.title,
         body: form.body,
       },
@@ -56,6 +53,8 @@ export function NoticePage() {
     )
   }
 
+  const targetName = orgs.data?.items.find((org) => org.orgId === form.orgId)?.name
+
   return (
     <div className="grid-2">
       <Card title="공지 작성">
@@ -65,7 +64,7 @@ export function NoticePage() {
             <select
               className="select"
               value={form.scope}
-              onChange={(e) => setForm({ ...form, scope: e.target.value as NoticeScope })}
+              onChange={(event) => setForm({ ...form, scope: event.target.value as 'all' | 'org' })}
             >
               <option value="all">전체 공지</option>
               <option value="org">특정 기관</option>
@@ -80,11 +79,11 @@ export function NoticePage() {
               <select
                 className="select"
                 value={form.orgId}
-                onChange={(e) => setForm({ ...form, orgId: e.target.value })}
+                onChange={(event) => setForm({ ...form, orgId: event.target.value })}
               >
                 <option value="">기관을 고르세요</option>
                 {orgs.data?.items.map((org) => (
-                  <option key={org.id} value={org.id}>
+                  <option key={org.orgId} value={org.orgId}>
                     {org.name}
                   </option>
                 ))}
@@ -98,15 +97,15 @@ export function NoticePage() {
               <input
                 className="input"
                 type="date"
-                value={form.startAt}
-                onChange={(e) => setForm({ ...form, startAt: e.target.value })}
+                value={form.startsOn}
+                onChange={(event) => setForm({ ...form, startsOn: event.target.value })}
               />
               <span className="muted">~</span>
               <input
                 className="input"
                 type="date"
-                value={form.endAt}
-                onChange={(e) => setForm({ ...form, endAt: e.target.value })}
+                value={form.endsOn}
+                onChange={(event) => setForm({ ...form, endsOn: event.target.value })}
               />
             </div>
           </div>
@@ -115,9 +114,10 @@ export function NoticePage() {
             <span className="field__label">제목</span>
             <input
               className="input"
+              maxLength={200}
               placeholder="8/15 새벽 서버 점검 안내"
               value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              onChange={(event) => setForm({ ...form, title: event.target.value })}
             />
           </div>
 
@@ -125,7 +125,7 @@ export function NoticePage() {
             className="textarea"
             placeholder="본문"
             value={form.body}
-            onChange={(e) => setForm({ ...form, body: e.target.value })}
+            onChange={(event) => setForm({ ...form, body: event.target.value })}
           />
 
           <div className="form__footer">
@@ -147,7 +147,9 @@ export function NoticePage() {
             </button>
           </div>
 
-          <p className="card__note">노출 기간이 지나면 자동으로 내려갑니다.</p>
+          <p className="card__note">
+            특정 기관 공지는 그 기관 담당자 화면(T2)에만 노출 · 노출 기간이 지나면 자동 종료
+          </p>
         </div>
       </Card>
 
@@ -165,20 +167,32 @@ export function NoticePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.items.map((notice) => (
-                    <tr key={notice.id}>
-                      <td>{notice.createdAt}</td>
-                      <td>
-                        <Badge tone={notice.scope === 'all' ? 'muted' : 'danger'}>
-                          {notice.scope === 'all' ? '전체' : (notice.orgName ?? '특정 기관')}
-                        </Badge>
-                      </td>
-                      <td>{notice.title}</td>
-                      <td>
-                        <Badge tone={STATE[notice.state].tone}>{STATE[notice.state].label}</Badge>
+                  {data.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="muted">
+                        보낸 공지가 없습니다.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    data.map((notice) => (
+                      <tr key={notice.id}>
+                        <td>{shortDate(notice.createdAt)}</td>
+                        <td>
+                          <Badge tone={notice.targetOrganizationId ? 'danger' : 'muted'}>
+                            {notice.targetOrganizationId
+                              ? (notice.targetOrgName ?? '특정 기관')
+                              : '전체'}
+                          </Badge>
+                        </td>
+                        <td>{notice.title}</td>
+                        <td>
+                          <Badge tone={noticeStatusTone[notice.displayStatus]}>
+                            {noticeStatusLabel[notice.displayStatus]}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -190,15 +204,13 @@ export function NoticePage() {
         <div className="notice-box">
           <div style={{ marginBottom: 8 }}>
             <Badge tone={form.scope === 'all' ? 'muted' : 'danger'}>
-              {form.scope === 'all'
-                ? '전체'
-                : (orgs.data?.items.find((org) => org.id === form.orgId)?.name ?? '특정 기관')}
+              {form.scope === 'all' ? '전체' : (targetName ?? '특정 기관')}
             </Badge>
           </div>
           <div style={{ color: 'var(--ink)', fontWeight: 700, marginBottom: 6 }}>{form.title}</div>
           <div style={{ color: 'var(--ink)', whiteSpace: 'pre-wrap' }}>{form.body}</div>
           <div style={{ marginTop: 10 }}>
-            노출 {form.startAt || '—'} ~ {form.endAt || '—'}
+            노출 {form.startsOn || '—'} ~ {form.endsOn || '—'}
           </div>
         </div>
       </Modal>

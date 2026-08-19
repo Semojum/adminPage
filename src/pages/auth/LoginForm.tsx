@@ -2,29 +2,36 @@ import { useId, useState, type FormEvent, type ReactNode } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { demoLoginAccounts, isMockApi } from '@/api'
 import { LoginFailure, type Role, type Session } from '@/api/types'
-import { useAuth, type Entry } from '@/auth/AuthContext'
+import { useAuth } from '@/auth/AuthContext'
 import { LoginLayout } from './LoginLayout'
 
 interface Props {
-  entry: Entry
   /** 카드 위에 적는 주소 — 이 진입점이 어디인지 알려 줍니다. */
   host: string
   title: string
   description: string
-  /** 이 진입점을 쓰는 역할 → 로그인 뒤 갈 곳 */
+  /** 이 진입점을 쓰는 역할 → 로그인 뒤 갈 곳. 여기 없는 역할은 안내 후 막습니다. */
   destinations: Partial<Record<Role, string>>
+  /** 카드 아래 안내 문구 */
+  footNote: ReactNode
   /** 목업 안내에 띄울 역할 */
   demoRoles: Role[]
   /** 다른 진입점으로 건너가는 링크 */
   crossLink?: ReactNode
 }
 
+/**
+ * 로그인 (AD-T1-0 · V3-01).
+ *
+ * 명세 §로그인: POST /api/auth/login 하나로 모두 로그인하고, **응답 role 로 화면이 갈립니다.**
+ * 그래서 "로그인은 됐지만 이 주소에 들어올 수 없는" 경우를 화면이 직접 안내합니다.
+ */
 export function LoginForm({
-  entry,
   host,
   title,
   description,
   destinations,
+  footNote,
   demoRoles,
   crossLink,
 }: Props) {
@@ -33,21 +40,20 @@ export function LoginForm({
   const location = useLocation()
   const formId = useId()
 
-  const [accountId, setAccountId] = useState('')
+  const [loginId, setLoginId] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(
-    // 권한이 없어 되돌려 보내진 경우엔 이유를 먼저 알려 줍니다.
     (location.state as { forbidden?: boolean } | null)?.forbidden
       ? '이 화면을 볼 수 있는 계정으로 로그인해 주세요.'
       : null,
   )
-  /** 로그인은 됐지만 이 빌드에 갈 화면이 없는 경우 (점역사 · T3) */
-  const [noDestination, setNoDestination] = useState<Session | null>(null)
+  /** 로그인은 됐지만 이 진입점이 받지 않는 역할 */
+  const [wrongEntry, setWrongEntry] = useState<Session | null>(null)
 
   const goAfterLogin = (next: Session) => {
     const destination = destinations[next.role]
     if (!destination) {
-      setNoDestination(next)
+      setWrongEntry(next)
       return
     }
     // 로그인하러 튕겨 나온 화면이 있으면 그곳으로 되돌려 보냅니다.
@@ -59,7 +65,7 @@ export function LoginForm({
     event.preventDefault()
     setError(null)
     try {
-      goAfterLogin(await login(entry, { accountId, password }))
+      goAfterLogin(await login({ loginId, password }))
     } catch (caught) {
       setError(
         caught instanceof LoginFailure
@@ -70,24 +76,24 @@ export function LoginForm({
   }
 
   // 이미 로그인한 채로 로그인 화면에 들어왔으면 곧바로 제 화면으로 보냅니다.
-  const alreadyIn = session && !noDestination ? destinations[session.role] : undefined
+  const alreadyIn = session && !wrongEntry ? destinations[session.role] : undefined
   if (alreadyIn) return <Navigate to={alreadyIn} replace />
 
-
-  if (noDestination) {
+  if (wrongEntry) {
     return (
       <LoginLayout>
         <LoginHeader host={host} title={title} description={description} />
         <p className="notice-box">
-          <strong>{noDestination.displayName}</strong> 은 점역사(ROLE_USER) 계정입니다. 로그인은
-          되었지만, 점역사가 보는 <strong>T3 사용량</strong> 화면은 이번 범위에 없습니다.
+          <strong>{wrongEntry.loginId}</strong> 은 <strong>{ROLE_LABEL[wrongEntry.role]}</strong> 계정입니다.
+          {' '}
+          {ENTRY_HINT[wrongEntry.role]}
         </p>
         <button
           type="button"
           className="btn btn--primary btn--block"
           onClick={async () => {
             await logout()
-            setNoDestination(null)
+            setWrongEntry(null)
             setPassword('')
           }}
         >
@@ -111,8 +117,9 @@ export function LoginForm({
             className="input"
             autoComplete="username"
             autoFocus
-            value={accountId}
-            onChange={(event) => setAccountId(event.target.value)}
+            placeholder="admin01"
+            value={loginId}
+            onChange={(event) => setLoginId(event.target.value)}
           />
         </div>
 
@@ -139,21 +146,31 @@ export function LoginForm({
         <button
           type="submit"
           className="btn btn--primary btn--block btn--tall"
-          disabled={!accountId || !password || loggingIn}
+          disabled={!loginId || !password || loggingIn}
         >
           {loggingIn ? '확인 중…' : '로그인'}
         </button>
       </form>
 
-      <p className="login__foot">
-        비밀번호는 세모점이 발급합니다. 잊었으면 담당자에게 재발급을 요청해 주세요.
-      </p>
+      <p className="login__foot">{footNote}</p>
 
       {crossLink && <p className="login__foot">{crossLink}</p>}
 
       {isMockApi && <MockAccountHint roles={demoRoles} />}
     </LoginLayout>
   )
+}
+
+const ROLE_LABEL: Record<Role, string> = {
+  ROLE_ADMIN: '세모점 운영자',
+  ROLE_ORG_ADMIN: '기관 관리자',
+  ROLE_USER: '점역사',
+}
+
+const ENTRY_HINT: Record<Role, string> = {
+  ROLE_ADMIN: '운영자 콘솔(admin.semo-jum.com)로 들어가 주세요.',
+  ROLE_ORG_ADMIN: '서비스 앱의 [기관 관리] 탭에서 볼 수 있습니다.',
+  ROLE_USER: '점역사가 보는 사용량(T3) 화면은 이번 범위에 없습니다.',
 }
 
 function LoginHeader({
@@ -177,7 +194,7 @@ function LoginHeader({
   )
 }
 
-/** 목업 모드에서만 보이는 안내. 실제 인증이 붙으면 사라집니다. */
+/** 목업 모드에서만 보이는 안내. 실제 서버를 쓰면 사라집니다. */
 function MockAccountHint({ roles }: { roles: Role[] }) {
   const accounts = demoLoginAccounts.filter((account) => roles.includes(account.role))
   if (accounts.length === 0) return null
@@ -190,8 +207,8 @@ function MockAccountHint({ roles }: { roles: Role[] }) {
       </div>
       <ul className="login__mock-list">
         {accounts.map((account) => (
-          <li key={account.accountId}>
-            <code>{account.accountId}</code>
+          <li key={account.loginId}>
+            <code>{account.loginId}</code>
             <code>{account.password}</code>
             <span>{account.hint}</span>
           </li>

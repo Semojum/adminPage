@@ -25,15 +25,10 @@ export function OrgLayout() {
             {isMockApi && (
               <>
                 <span className="mock-flag">MOCK</span>
-                <MockRoleSwitch
-                  role="ROLE_ADMIN"
-                  entry="admin"
-                  to="/admin/stats"
-                  label="T1 운영자 콘솔"
-                />
+                <MockRoleSwitch role="ROLE_ADMIN" to="/admin/stats" label="T1 운영자 콘솔" />
               </>
             )}
-            <span className="btn btn--sm">{session?.displayName}</span>
+            <span className="btn btn--sm">{session?.loginId}</span>
             <button type="button" className="btn btn--sm" onClick={signOut}>
               로그아웃
             </button>
