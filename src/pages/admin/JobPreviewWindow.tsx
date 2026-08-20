@@ -11,13 +11,35 @@ import { resultFormat } from '@/lib/format'
 const textOf = (item: PageTextItem): string =>
   typeof item === 'string' ? item : (item.contents ?? '')
 
+/** 점자 유니코드(U+2800~U+28FF)가 섞여 있으면 점자 타이포로 보여줍니다. */
+const hasBraille = (text: string) => /[⠀-⣿]/.test(text)
+
+/**
+ * 원본 글줄을 블록으로 묶습니다.
+ * 앱은 의미 단위 블록(originalTextBlocks)을 받지만 운영자 API 는 줄 배열만 줍니다.
+ * 빈 줄을 경계로 삼아 문단처럼 끊으면 앱과 같은 모양이 됩니다.
+ */
+function groupLines(lines: string[]): string[] {
+  const blocks: string[][] = []
+  for (const line of lines) {
+    if (line.trim() === '') {
+      if (blocks.length > 0 && blocks[blocks.length - 1].length > 0) blocks.push([])
+      continue
+    }
+    if (blocks.length === 0) blocks.push([])
+    blocks[blocks.length - 1].push(line)
+  }
+  return blocks.filter((block) => block.length > 0).map((block) => block.join('\n'))
+}
+
 /**
  * AD-T1-5 · 변환 결과 미리보기 (새 창, T1-4 의 [변환 결과 보기])
  *
- * GET /api/admin/jobs/{jobId}/pages/{pageNo} — 원본(a·c 는 presigned PDF, b 는 글줄)과 변환 결과를 나란히.
+ * GET /api/admin/jobs/{jobId}/pages/{pageNo} — 원본(a·c 는 presigned PDF, b 는 글줄)과 변환 결과.
  * POST /api/admin/jobs/{jobId}/send-to-mypage — 운영자 계정 마이페이지로 사본을 보냅니다.
  *
- * 이 창은 확인용입니다. 편집이나 재변환은 하지 않습니다(기획 확정).
+ * 입출력 패널은 세모점 앱(FE)의 변환 화면 디자인을 그대로 씁니다.
+ * 다만 이 창은 확인용이라 편집·재변환 컨트롤은 두지 않습니다(기획 확정).
  */
 export function JobPreviewWindow() {
   const { jobId = '' } = useParams()
@@ -44,8 +66,12 @@ export function JobPreviewWindow() {
 
   const data = page.data
   const format = resultFormat(data.mode)
-  const resultLines = (data.result.braille_text_list ?? data.result.text_list ?? []).map(textOf)
-  const resultFileName = data.originalFileName.replace(/\.[^.]+$/, '') + (format === 'BRF' ? '.brf' : '.txt')
+  const blocks = (data.result.braille_text_list ?? data.result.text_list ?? [])
+    .map(textOf)
+    .filter((text) => text.trim() !== '')
+  const sourceBlocks = groupLines(data.original.lines ?? [])
+  const resultFileName =
+    data.originalFileName.replace(/\.[^.]+$/, '') + (format === 'BRF' ? '.brf' : '.txt')
 
   return (
     <WindowShell
@@ -66,48 +92,71 @@ export function JobPreviewWindow() {
         </button>
       }
     >
-      <div className="grid-2">
-        <div>
-          <p className="card__note" style={{ marginBottom: 8 }}>
-            원본 · {data.pageNo}쪽 / {data.totalPages}쪽
-          </p>
-          <div className="preview-pane">
-            <div className="preview-pane__head">{data.originalFileName}</div>
-            <div className="preview-pane__body">
-              {data.original.type === 'pdf' && data.original.url ? (
-                // presigned URL 은 15분이면 만료됩니다 — 저장하지 않고 그때그때 받은 것을 씁니다.
-                <object
-                  data={data.original.url}
-                  type="application/pdf"
-                  style={{ width: '100%', height: 420, border: 0 }}
-                  aria-label={`${data.originalFileName} ${data.pageNo}쪽 원본`}
-                >
-                  <a className="table__link" href={data.original.url}>
-                    원본 PDF 열기
-                  </a>
-                </object>
-              ) : (
-                <pre className="braille">{(data.original.lines ?? []).join('\n')}</pre>
-              )}
-            </div>
+      <div className="io">
+        {/* 입력 — 원본 파일 */}
+        <section className="io-panel">
+          <header className="io-panel__head">
+            <h2 className="io-panel__title">원본 파일</h2>
+            <span className="io-panel__meta">
+              {data.originalFileName} · {data.pageNo}/{data.totalPages}쪽
+            </span>
+          </header>
+          <div className="io-panel__body">
+            {data.original.type === 'pdf' && data.original.url ? (
+              <div className="io-doc">
+                <div className="io-doc__paper">
+                  {/* presigned URL 은 15분이면 만료됩니다 — 저장하지 않고 그때그때 받은 것을 씁니다. */}
+                  <iframe
+                    className="io-doc__frame"
+                    src={data.original.url}
+                    title={`${data.originalFileName} ${data.pageNo}쪽 원본`}
+                  />
+                </div>
+              </div>
+            ) : sourceBlocks.length > 0 ? (
+              <div className="io-lines">
+                {sourceBlocks.map((block, index) => (
+                  <p className="io-line" key={index}>
+                    {block}
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <div className="io-empty">
+                <span>원본을 불러오지 못했습니다.</span>
+              </div>
+            )}
           </div>
-        </div>
+        </section>
 
-        <div>
-          <p className="card__note" style={{ marginBottom: 8 }}>
-            변환 결과 · <strong>{format}</strong>{' '}
-            {format === 'BRF' ? '(점역·통합 변환)' : '(OCR 변환)'}
-          </p>
-          <div className="preview-pane">
-            <div className="preview-pane__head">{resultFileName}</div>
-            <div className="preview-pane__body">
-              <pre className="braille">{resultLines.join('\n')}</pre>
-            </div>
+        {/* 출력 — 점역/번역 결과 */}
+        <section className="io-panel">
+          <header className="io-panel__head">
+            <h2 className="io-panel__title">점역/번역 결과</h2>
+            <span className="io-panel__meta">
+              {resultFileName} · {format}
+              {format === 'BRF' ? ' (점역·통합 변환)' : ' (OCR 변환)'}
+            </span>
+          </header>
+          <div className="io-panel__body">
+            {blocks.length > 0 ? (
+              <div className="io-blocks">
+                {blocks.map((text, index) => (
+                  <div className="io-block" key={index}>
+                    <div className={hasBraille(text) ? 'io-braille' : 'io-text'}>{text}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="io-empty">
+                <span>결과가 없습니다.</span>
+              </div>
+            )}
           </div>
-        </div>
+        </section>
       </div>
 
-      <div className="window__bar" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+      <div className="io-pager">
         <button
           type="button"
           className="btn btn--sm"
@@ -116,7 +165,7 @@ export function JobPreviewWindow() {
         >
           ‹ 이전 쪽
         </button>
-        <span className="card__note num">
+        <span className="io-pager__count">
           {data.pageNo} / {data.totalPages}
         </span>
         <button

@@ -1109,6 +1109,178 @@ textarea {
   white-space: nowrap;
 }
 
+/* ─────────────── 입출력 패널 (T1-5 변환 결과 미리보기) ───────────────
+ *
+ * 세모점 앱(FE)의 변환 화면 디자인을 그대로 옮겼습니다.
+ * 큰 라운드의 흰 패널 + 안에서만 스크롤, 강조색 #407FAC / 선택 #5A8FBB,
+ * 결과는 블록 카드로 끊어 보여주고 점자는 크게 자간을 벌려 씁니다.
+ * 운영자 화면은 확인 전용이라 편집 컨트롤(드래그·추가·삭제)은 옮기지 않았습니다.
+ */
+
+.io {
+  --io-accent: #407fac;
+  --io-select: #5a8fbb;
+  display: grid;
+  /* 결과 쪽을 조금 넓게 — 앱과 같은 비율입니다. */
+  grid-template-columns: 1fr 1.4fr;
+  gap: 24px;
+  align-items: stretch;
+}
+
+@media (max-width: 1000px) {
+  .io {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.io-panel {
+  background: var(--surface);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 32px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.1);
+  padding: 24px;
+  height: 520px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.io-panel__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.io-panel__title {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.io-panel__meta {
+  font-size: 12px;
+  color: var(--sub);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.io-panel__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border-radius: 24px;
+  background: #f8fafc;
+  padding: 16px;
+}
+
+/* 원본 — PDF·이미지는 흰 종이 위에 올려 놓습니다. */
+.io-doc {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.io-doc__paper {
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+  width: 100%;
+}
+
+.io-doc__frame {
+  display: block;
+  width: 100%;
+  height: 420px;
+  border: 0;
+}
+
+/* 원본 글줄 — 앱의 텍스트 블록과 같은 모양 */
+.io-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.io-line {
+  background: var(--surface);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--sub);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'Menlo', 'Consolas', monospace;
+}
+
+/* 결과 블록 */
+.io-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.io-block {
+  background: var(--surface);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 10px 12px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.io-block:hover {
+  border-color: var(--line);
+  background: #f8fafc;
+}
+
+/* 점자는 크게, 자간을 벌려서 */
+.io-braille {
+  font-size: 22px;
+  letter-spacing: 0.12em;
+  line-height: 1.7;
+  color: #1f2937;
+  word-break: break-word;
+  font-variant-numeric: tabular-nums;
+}
+
+.io-text {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #1f2937;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.io-empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* 쪽 이동 */
+.io-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.io-pager__count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sub);
+  font-variant-numeric: tabular-nums;
+}
+
 /* 미리보기(T1-5) */
 .preview-pane {
   border: 1px solid var(--line);
