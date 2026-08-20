@@ -122,7 +122,14 @@ export function VBarChart({
 }) {
   const totals = data.map((d) => d.primary + (d.secondary ?? 0))
   const max = Math.max(1, ...totals)
-  const ticks = Array.from({ length: axisTicks }, (_, i) => Math.round((max / axisTicks) * (axisTicks - i)))
+  /**
+   * 눈금은 최대값을 나눠 잡습니다(Figma 목업도 같은 방식 — 210 / 141 / 69).
+   * 다만 값이 작으면 반올림이 뭉개져 "1 1 0" 처럼 겹치거나 0이 생기므로,
+   * 0과 중복을 걷어냅니다. 다루는 값이 전부 건수·쪽수·크레딧이라 눈금은 정수로 둡니다.
+   */
+  const ticks = Array.from({ length: axisTicks }, (_, i) =>
+    Math.round((max / axisTicks) * (axisTicks - i)),
+  ).filter((tick, index, all) => tick > 0 && all.indexOf(tick) === index)
 
   return (
     <div className="vbars">

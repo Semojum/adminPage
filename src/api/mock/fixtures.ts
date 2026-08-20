@@ -612,6 +612,23 @@ export const inquiries: T.Inquiry[] = [
     statusChangedAt: hoursAgo(20),
   },
   {
+    id: 'inq-4',
+    type: 'EMAIL',
+    status: 'OPEN',
+    orgName: null,
+    loginId: null,
+    // 명세 §문의: 메일은 text/plain 이 없으면 HTML 원문이 그대로 옵니다.
+    message:
+      '<html><head><style>p{color:#333}</style></head><body><p>안녕하세요, 세모점 담당자님</p>' +
+      '<p>지난주에 보낸 교재 파일이 <b>표 부분</b>에서 계속 실패합니다.<br/>확인 부탁드립니다.</p>' +
+      '<table><tr><td>파일명</td><td>수능특강_생명II.pdf</td></tr><tr><td>쪽</td><td>8쪽</td></tr></table>' +
+      '<p>감사합니다.</p></body></html>',
+    senderEmail: 'teacher@snsb.sc.kr',
+    subject: '표 변환 실패 문의',
+    createdAt: hoursAgo(30),
+    statusChangedAt: null,
+  },
+  {
     id: 'inq-3',
     type: 'CREDIT_ADD',
     status: 'ANSWERED',

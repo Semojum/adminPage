@@ -4,6 +4,7 @@ import { useInquiries, useSetInquiryStatus } from '@/api/queries'
 import { Badge, Card, Query } from '@/components/ui'
 import { Modal } from '@/components/Modal'
 import { useToast } from '@/components/Toast'
+import { htmlToText } from '@/lib/html'
 import {
   inquiryElapsed,
   inquiryStatusLabel,
@@ -174,7 +175,7 @@ function InquiryModal({ inquiry, onClose }: { inquiry: Inquiry | null; onClose: 
     <Modal
       open={inquiry !== null}
       width={560}
-      title={inquiry ? inquiryTypeLabel[inquiry.type] : '문의'}
+      title={inquiry ? (inquiry.subject ?? inquiryTypeLabel[inquiry.type]) : '문의'}
       onClose={onClose}
       footer={
         <>
@@ -212,9 +213,24 @@ function InquiryModal({ inquiry, onClose }: { inquiry: Inquiry | null; onClose: 
             <div style={{ marginBottom: 6 }}>
               {inquiry.orgName ?? inquiry.senderEmail ?? '미가입'}
               {inquiry.loginId ? ` · ${inquiry.loginId}` : ''} · {shortDateTime(inquiry.createdAt)} ·{' '}
-              {inquiryStatusLabel[inquiry.status]}
+              {inquiryTypeLabel[inquiry.type]} · {inquiryStatusLabel[inquiry.status]}
             </div>
-            <div style={{ color: 'var(--ink)', whiteSpace: 'pre-wrap' }}>{inquiry.message}</div>
+            {/*
+              메일 문의는 본문이 HTML 원문으로 올 수 있습니다(명세 §문의).
+              태그를 걷어내고 글자만 보여줍니다 — 바깥에서 온 본문이라 HTML 로 그리지 않습니다.
+              10,000자까지 올 수 있어 길면 이 칸 안에서 스크롤합니다.
+            */}
+            <div
+              style={{
+                color: 'var(--ink)',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                maxHeight: 320,
+                overflowY: 'auto',
+              }}
+            >
+              {htmlToText(inquiry.message)}
+            </div>
           </div>
           {/* 답변 본문을 저장하는 API 가 아직 없습니다 — 회신은 메일·전화로 하고 상태만 남깁니다. */}
           <p className="card__note">

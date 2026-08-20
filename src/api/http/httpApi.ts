@@ -49,26 +49,17 @@ interface LoginResult {
 export const httpApi: Api = {
   auth: {
     /**
-     * 저장해 둔 리프레시 토큰이 아직 살아 있는지 확인합니다.
-     * 살아 있으면 그 세션을, 아니면 null 을 돌려줍니다. (세션 조회 API 가 따로 없습니다.)
+     * 저장해 둔 세션을 그대로 돌려줍니다. (세션 조회 API 가 따로 없습니다.)
+     *
+     * 부팅할 때 재발급을 미리 때리지 않습니다 — 액세스 토큰이 만료됐으면
+     * 첫 호출이 401 을 받고 client 가 그때 한 번 재발급한 뒤 재요청합니다.
+     *
+     * 새 창(작업 상세·기관 정보 …)은 새 문서라 앱이 한 번 더 뜹니다.
+     * 부팅마다 재발급을 부르면 창을 열 때마다 같은 리프레시 토큰을 다시 쓰게 되고,
+     * 서버가 토큰을 한 번만 허용하거나 원래 창과 겹치면 AUTH4003 으로 세션이 끊깁니다.
      */
     async getSession() {
-      const stored = getStoredSession()
-      if (!stored) return null
-      try {
-        const result = await http.post<{ accessToken: string }>(
-          '/api/auth/refresh',
-          { refreshToken: stored.refreshToken },
-          { anonymous: true },
-        )
-        const next = { ...stored, accessToken: result.accessToken }
-        setStoredSession(next)
-        return next
-      } catch {
-        // AUTH4003(만료·밀려난 세션) · AUTH4004(비활성 계정) — 다시 로그인해야 합니다.
-        setStoredSession(null)
-        return null
-      }
+      return getStoredSession()
     },
 
     async login(input) {
