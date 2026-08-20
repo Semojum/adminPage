@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ToastProvider } from '@/components/Toast'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { AuthProvider } from '@/auth/AuthContext'
 import { RequireRole } from '@/auth/RequireRole'
 import { AdminLayout } from '@/layouts/AdminLayout'
@@ -41,6 +42,7 @@ export function App() {
       <BrowserRouter>
         <AuthProvider>
           <ToastProvider>
+            <ErrorBoundary>
             <Routes>
               <Route path="/" element={<Navigate to="/admin/stats" replace />} />
 
@@ -78,6 +80,7 @@ export function App() {
 
               <Route path="*" element={<Navigate to="/admin/stats" replace />} />
             </Routes>
+            </ErrorBoundary>
           </ToastProvider>
         </AuthProvider>
       </BrowserRouter>

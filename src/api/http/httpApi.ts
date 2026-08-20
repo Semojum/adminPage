@@ -132,15 +132,37 @@ export const httpApi: Api = {
     getOrgs: (month) =>
       http.get<T.AdminOrgList>('/api/admin/orgs', { month }).then((result) => ({
         month: result?.month ?? '',
-        items: list<T.AdminOrgRow>(result).map((org) => ({ ...org, orgId: orgIdOf(org) })),
+        items: list<T.AdminOrgRow>(result).map((org) => ({
+          ...org,
+          orgId: orgIdOf(org),
+          // 계정이 없는 기관이 배열 없이 올 수 있습니다 — 목록을 그리다 터지지 않게 맞춰 둡니다.
+          accounts: Array.isArray(org?.accounts) ? org.accounts : [],
+          subtotal: org?.subtotal ?? { accountCount: 0, monthCredits: 0, adminLastLoginAt: null },
+        })),
       })),
 
     createOrg: (input) => http.post<T.CreatedOrg>('/api/admin/orgs', input),
 
+    /**
+     * 명세에 이 응답의 필드가 열거돼 있지 않습니다.
+     * 없는 값이 와도 화면이 터지지 않도록 여기서 빈 값을 채워 둡니다 —
+     * 특히 accounts 가 없으면 목록을 그리다 예외가 납니다.
+     */
     getOrg: (orgId) =>
-      http
-        .get<T.OrgDetail>(`/api/admin/orgs/${encodeURIComponent(orgId)}`)
-        .then((result) => ({ ...result, orgId: orgIdOf(result) || orgId })),
+      http.get<Partial<T.OrgDetail>>(`/api/admin/orgs/${encodeURIComponent(orgId)}`).then((result) => ({
+        orgId: orgIdOf(result) || orgId,
+        name: result?.name ?? '',
+        code: result?.code ?? '',
+        contractType: result?.contractType ?? 'FREE',
+        contractStartedAt: result?.contractStartedAt ?? null,
+        contractExpiresAt: result?.contractExpiresAt ?? null,
+        creditAllocated: result?.creditAllocated ?? 0,
+        creditUsed: result?.creditUsed ?? 0,
+        creditRemaining:
+          result?.creditRemaining ?? (result?.creditAllocated ?? 0) - (result?.creditUsed ?? 0),
+        receiptEmail: result?.receiptEmail ?? null,
+        accounts: Array.isArray(result?.accounts) ? result.accounts : [],
+      })),
 
     updateOrg: (orgId, patch) =>
       http.patch<T.OrgDetail>(`/api/admin/orgs/${encodeURIComponent(orgId)}`, patch),

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './index'
 import type {
   AccountStatus,
@@ -67,6 +67,28 @@ export const useLayoutCost = (month: string) =>
 
 export const useProfitability = (month: string) =>
   useQuery({ queryKey: qk.profitability(month), queryFn: () => api.admin.getProfitability(month) })
+
+/**
+ * 여러 달을 한 번에.
+ *
+ * 원가 API 는 month=YYYY-MM 로 한 달씩만 받습니다(명세).
+ * 기간으로 보려면 달마다 부른 뒤 화면에서 합쳐야 합니다.
+ */
+export const useLayoutCostMonths = (months: string[]) =>
+  useQueries({
+    queries: months.map((month) => ({
+      queryKey: qk.layoutCost(month),
+      queryFn: () => api.admin.getLayoutCost(month),
+    })),
+  })
+
+export const useProfitabilityMonths = (months: string[]) =>
+  useQueries({
+    queries: months.map((month) => ({
+      queryKey: qk.profitability(month),
+      queryFn: () => api.admin.getProfitability(month),
+    })),
+  })
 
 /* ── T1-3 ── 명세 §T1-3: 10초마다 폴링합니다. */
 export const MONITORING_REFETCH_MS = 10_000
