@@ -93,8 +93,12 @@ export interface StatsOverview {
   pagesProcessed: number
   /** 직전 기간 전체 — "어제 1,020쪽 · +18%" 비교용 */
   prevPagesProcessed: number
-  /** today=시간별 / week·month=일별. 빈 버킷은 서버가 빼고 주므로 화면이 0을 채웁니다. */
-  series: Array<{ bucket: string; pages: number }>
+  /**
+   * today=시간별 / week·month=일별.
+   * 2026-08-20 부터 버킷마다 쪽수(pages)와 시작 건수(jobs)를 함께 줍니다.
+   * 빈 버킷은 서버가 빼고 주므로 화면이 0을 채웁니다.
+   */
+  series: Array<{ bucket: string; pages: number; jobs: number }>
   cost: {
     todayKrw: Won
     yesterdayKrw: Won
@@ -118,6 +122,8 @@ export interface Workload {
     bucket: string
     completed: number
     failedOrCanceled: number
+    /** 그 버킷의 처리(성공) 쪽수 — 2026-08-20 추가 */
+    pages: number
   }>
 }
 

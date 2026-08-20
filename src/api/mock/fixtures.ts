@@ -69,7 +69,7 @@ export const statsOverview: Record<T.Period, T.StatsOverview> = {
     jobs: { total: 18, completed: 15, inProgress: 2, failed: 1 },
     pagesProcessed: 1204,
     prevPagesProcessed: 1020,
-    series: HOURLY.map(([hour, pages]) => ({ bucket: at(0, hour, 0), pages })),
+    series: HOURLY.map(([hour, pages]) => ({ bucket: at(0, hour, 0), pages, jobs: Math.max(1, Math.round(pages / 12)) })),
     cost: {
       todayKrw: 38_400,
       yesterdayKrw: 34_100,
@@ -92,6 +92,7 @@ export const statsOverview: Record<T.Period, T.StatsOverview> = {
     series: [6, 5, 4, 3, 2, 1, 0].map((daysAgo, index) => ({
       bucket: at(daysAgo, 0, 0),
       pages: [820, 1_140, 980, 1_260, 900, 1_100, 440][index],
+      jobs: [12, 16, 14, 18, 13, 15, 6][index],
     })),
     cost: {
       todayKrw: 38_400,
@@ -115,6 +116,7 @@ export const statsOverview: Record<T.Period, T.StatsOverview> = {
     series: Array.from({ length: 14 }, (_, index) => ({
       bucket: at(13 - index, 0, 0),
       pages: [780, 910, 1_040, 860, 1_180, 990, 1_240, 1_020, 1_160, 880, 1_300, 1_050, 1_120, 1_204][index],
+      jobs: [11, 13, 15, 12, 17, 14, 18, 15, 16, 13, 19, 15, 16, 18][index],
     })),
     cost: {
       todayKrw: 38_400,
@@ -148,6 +150,7 @@ export const workload: Record<T.Bucket, T.Workload> = {
       bucket: at(13 - index, 0, 0),
       completed: [38, 42, 51, 40, 55, 47, 60, 49, 58, 41, 62, 50, 54, 57][index],
       failedOrCanceled: [2, 1, 3, 2, 1, 2, 4, 1, 2, 1, 3, 2, 1, 2][index],
+      pages: [780, 910, 1_040, 860, 1_180, 990, 1_240, 1_020, 1_160, 880, 1_300, 1_050, 1_120, 1_204][index],
     })),
   },
   weekly: {
@@ -156,6 +159,7 @@ export const workload: Record<T.Bucket, T.Workload> = {
       bucket: at((5 - index) * 7, 0, 0),
       completed,
       failedOrCanceled,
+      pages: [5_400, 6_000, 4_200, 7_000, 7_700, 9_100][index],
     })),
   },
   monthly: {
@@ -166,6 +170,7 @@ export const workload: Record<T.Bucket, T.Workload> = {
         bucket: iso(date),
         completed: [880, 940, 1_010, 960, 1_180, 1_240][index],
         failedOrCanceled: [40, 32, 45, 38, 52, 48][index],
+        pages: [21_000, 22_400, 24_100, 23_000, 26_200, 27_000][index],
       }
     }),
   },
@@ -177,6 +182,7 @@ export const workload: Record<T.Bucket, T.Workload> = {
         bucket: iso(date),
         completed: [420, 610, 780, 880, 940, 1_010, 960, 1_180, 1_240][index],
         failedOrCanceled: [30, 28, 36, 40, 32, 45, 38, 52, 48][index],
+        pages: [9_800, 14_300, 18_600, 21_000, 22_400, 24_100, 23_000, 26_200, 27_000][index],
       }
     }),
   },

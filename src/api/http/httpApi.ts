@@ -101,9 +101,27 @@ export const httpApi: Api = {
   },
 
   admin: {
-    getStatsOverview: (period) => http.get<T.StatsOverview>('/api/admin/stats/overview', { period }),
+    // 버킷의 jobs·pages 는 2026-08-20 에 추가됐습니다 — 빠진 응답이 와도 0 으로 채웁니다.
+    getStatsOverview: (period) =>
+      http.get<T.StatsOverview>('/api/admin/stats/overview', { period }).then((result) => ({
+        ...result,
+        series: (result.series ?? []).map((point) => ({
+          bucket: point.bucket,
+          pages: point.pages ?? 0,
+          jobs: point.jobs ?? 0,
+        })),
+      })),
 
-    getWorkload: (unit) => http.get<T.Workload>('/api/admin/stats/workload', { unit }),
+    getWorkload: (unit) =>
+      http.get<T.Workload>('/api/admin/stats/workload', { unit }).then((result) => ({
+        unit: result.unit,
+        buckets: (result.buckets ?? []).map((point) => ({
+          bucket: point.bucket,
+          completed: point.completed ?? 0,
+          failedOrCanceled: point.failedOrCanceled ?? 0,
+          pages: point.pages ?? 0,
+        })),
+      })),
 
     getLayoutCost: (month) => http.get<T.LayoutCostReport>('/api/admin/stats/layout-cost', { month }),
 
