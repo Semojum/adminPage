@@ -432,6 +432,18 @@ export type InquiryType =
 
 export type InquiryStatus = 'OPEN' | 'IN_REVIEW' | 'ANSWERED'
 
+/**
+ * 메일 문의 첨부 (V27, 2026-08-20).
+ * 파일당 10MB · 메일당 10개까지 보관하고, 없으면 빈 배열입니다.
+ * 내려받기는 별도 엔드포인트에서 presigned URL(15분)을 받습니다.
+ */
+export interface InquiryAttachment {
+  id: string
+  fileName: string
+  contentType: string
+  sizeBytes: number
+}
+
 export interface Inquiry {
   id: string
   type: InquiryType
@@ -445,6 +457,8 @@ export interface Inquiry {
   subject: string | null
   createdAt: string
   statusChangedAt: string | null
+  /** 메일 문의의 첨부·인라인 이미지. 그 외 유형은 빈 배열입니다. */
+  attachments: InquiryAttachment[]
 }
 
 /* ─────────────────── T1-10 · 공지 ─────────────────── */

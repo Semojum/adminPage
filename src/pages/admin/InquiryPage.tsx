@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import type { Inquiry, InquiryStatus, InquiryType } from '@/api/types'
-import { useInquiries, useSetInquiryStatus } from '@/api/queries'
+import type { Inquiry, InquiryAttachment, InquiryStatus, InquiryType } from '@/api/types'
+import { api } from '@/api'
+import { useInquiries, useInquiryAttachment, useSetInquiryStatus } from '@/api/queries'
 import { Badge, Card, Query } from '@/components/ui'
 import { Modal } from '@/components/Modal'
 import { useToast } from '@/components/Toast'
 import { htmlToText } from '@/lib/html'
 import {
+  fileSize,
   inquiryElapsed,
   inquiryStatusLabel,
   inquiryStatusTone,
@@ -128,7 +130,12 @@ export function InquiryPage() {
                         <tr key={inquiry.id}>
                           <td>{shortDateTime(inquiry.createdAt)}</td>
                           <td>{sender(inquiry)}</td>
-                          <td>{inquiryTypeLabel[inquiry.type]}</td>
+                          <td>
+                            {inquiryTypeLabel[inquiry.type]}
+                            {inquiry.attachments.length > 0 && (
+                              <span className="muted"> · 첨부 {inquiry.attachments.length}</span>
+                            )}
+                          </td>
                           <td>
                             <Badge tone={inquiryStatusTone[inquiry.status]}>
                               {inquiryStatusLabel[inquiry.status]}
@@ -243,6 +250,15 @@ function InquiryModal({ inquiry, onClose }: { inquiry: Inquiry | null; onClose: 
               {htmlToText(inquiry.message)}
             </div>
           </div>
+          {inquiry.attachments.length > 0 && (
+            <div className="attachments">
+              <span className="card__note">첨부 {inquiry.attachments.length}개</span>
+              {inquiry.attachments.map((attachment) => (
+                <AttachmentItem key={attachment.id} inquiryId={inquiry.id} attachment={attachment} />
+              ))}
+            </div>
+          )}
+
           {/* 답변 본문을 저장하는 API 가 아직 없습니다 — 회신은 메일·전화로 하고 상태만 남깁니다. */}
           <p className="card__note">
             답변 본문을 주고받는 API 는 아직 없습니다. 회신은 기존 경로로 하고, 여기서는 처리 상태만
@@ -251,5 +267,58 @@ function InquiryModal({ inquiry, onClose }: { inquiry: Inquiry | null; onClose: 
         </>
       )}
     </Modal>
+  )
+}
+
+
+/**
+ * 첨부 하나.
+ *
+ * 내려받기 주소는 presigned 15분짜리라 미리 받아 두지 않습니다.
+ * 이미지(contentType image/*)만 미리보기를 위해 열 때 한 번 받고,
+ * 나머지는 누를 때 받아서 새 창으로 엽니다.
+ */
+function AttachmentItem({
+  inquiryId,
+  attachment,
+}: {
+  inquiryId: string
+  attachment: InquiryAttachment
+}) {
+  const isImage = attachment.contentType.startsWith('image/')
+  const link = useInquiryAttachment(inquiryId, attachment.id, isImage)
+  const toast = useToast()
+
+  const open = async () => {
+    try {
+      const result = isImage && link.data ? link.data : await api.admin.getInquiryAttachment(inquiryId, attachment.id)
+      window.open(result.url, '_blank', 'noopener')
+    } catch {
+      toast('첨부를 받지 못했습니다.')
+    }
+  }
+
+  return (
+    <div className="attachment">
+      <div className="attachment__head">
+        <span className="attachment__name">{attachment.fileName}</span>
+        <span className="attachment__size">{fileSize(attachment.sizeBytes)}</span>
+        <span className="attachment__actions">
+          <button type="button" className="btn btn--sm" onClick={open}>
+            내려받기
+          </button>
+        </span>
+      </div>
+      {isImage &&
+        (link.data ? (
+          <img className="attachment__preview" src={link.data.url} alt={attachment.fileName} />
+        ) : link.error ? (
+          <p className="card__note" style={{ padding: '8px 10px' }}>
+            미리보기를 받지 못했습니다.
+          </p>
+        ) : (
+          <div className="skeleton" style={{ height: 120, borderRadius: 0 }} />
+        ))}
+    </div>
   )
 }

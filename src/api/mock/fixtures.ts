@@ -595,6 +595,7 @@ export const inquiries: T.Inquiry[] = [
     subject: null,
     createdAt: hoursAgo(9),
     statusChangedAt: null,
+    attachments: [],
   },
   {
     id: 'inq-2',
@@ -607,6 +608,7 @@ export const inquiries: T.Inquiry[] = [
     subject: 'OO출판사',
     createdAt: hoursAgo(26),
     statusChangedAt: hoursAgo(20),
+    attachments: [],
   },
   {
     id: 'inq-4',
@@ -624,6 +626,11 @@ export const inquiries: T.Inquiry[] = [
     subject: '표 변환 실패 문의',
     createdAt: hoursAgo(30),
     statusChangedAt: null,
+    // 메일당 10개·파일당 10MB 까지 (명세 V27)
+    attachments: [
+      { id: 'att-1', fileName: '실패화면.png', contentType: 'image/png', sizeBytes: 184_320 },
+      { id: 'att-2', fileName: '수능특강_생명II.pdf', contentType: 'application/pdf', sizeBytes: 2_411_724 },
+    ],
   },
   {
     id: 'inq-3',
@@ -636,6 +643,7 @@ export const inquiries: T.Inquiry[] = [
     subject: null,
     createdAt: hoursAgo(52),
     statusChangedAt: hoursAgo(48),
+    attachments: [],
   },
 ]
 

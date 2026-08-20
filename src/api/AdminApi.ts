@@ -121,6 +121,8 @@ export interface Api {
     getInquiries(params?: { status?: InquiryStatus; type?: InquiryType }): Promise<Inquiry[]>
     /** PATCH /api/admin/inquiries/{inquiryId}/status */
     setInquiryStatus(inquiryId: string, status: InquiryStatus): Promise<void>
+    /** GET /api/admin/inquiries/{inquiryId}/attachments/{attachmentId} — presigned 15분 */
+    getInquiryAttachment(inquiryId: string, attachmentId: string): Promise<ReceiptLink>
 
     /** GET /api/admin/notices */
     getNotices(): Promise<Notice[]>

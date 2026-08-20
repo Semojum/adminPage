@@ -366,6 +366,13 @@ export const modeLabel: Record<ConvertMode, string> = {
 /** 결과 파일 형식 — 명세 §결과 다운로드: mode a = .txt, b·c = .brf */
 export const resultFormat = (mode: ConvertMode | null): 'BRF' | 'TXT' => (mode === 'a' ? 'TXT' : 'BRF')
 
+/** 184320 → "180 KB" */
+export function fileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 /** 브라우저에 파일 저장을 넘깁니다. */
 export function downloadBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob)

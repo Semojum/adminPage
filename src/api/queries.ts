@@ -40,6 +40,8 @@ export const qk = {
 
   inquiries: (status: InquiryStatus | 'all', type: InquiryType | 'all') =>
     ['admin', 'inquiries', status, type] as const,
+  inquiryAttachment: (inquiryId: string, attachmentId: string) =>
+    ['admin', 'inquiry', inquiryId, 'attachment', attachmentId] as const,
   notices: ['admin', 'notices'] as const,
 
   orgDashboard: ['org', 'dashboard'] as const,
@@ -250,6 +252,19 @@ export const useInquiries = (status: InquiryStatus | 'all', type: InquiryType | 
         status: status === 'all' ? undefined : status,
         type: type === 'all' ? undefined : type,
       }),
+  })
+
+/**
+ * 첨부 내려받기 주소.
+ * presigned 15분이라 오래 들고 있지 않습니다 — 이미지 미리보기용으로만 미리 받습니다.
+ */
+export const useInquiryAttachment = (inquiryId: string, attachmentId: string, enabled: boolean) =>
+  useQuery({
+    queryKey: qk.inquiryAttachment(inquiryId, attachmentId),
+    queryFn: () => api.admin.getInquiryAttachment(inquiryId, attachmentId),
+    enabled,
+    staleTime: 0,
+    gcTime: 60_000,
   })
 
 export const useSetInquiryStatus = () => {

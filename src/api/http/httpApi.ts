@@ -215,7 +215,18 @@ export const httpApi: Api = {
     getInquiries: (params) =>
       http
         .get<unknown>('/api/admin/inquiries', { status: params?.status, type: params?.type })
-        .then((result) => list<T.Inquiry>(result)),
+        .then((result) =>
+          list<T.Inquiry>(result).map((inquiry) => ({
+            ...inquiry,
+            // 첨부가 없으면 빈 배열입니다(명세) — 필드가 아예 없어도 버티게 둡니다.
+            attachments: Array.isArray(inquiry.attachments) ? inquiry.attachments : [],
+          })),
+        ),
+
+    getInquiryAttachment: (inquiryId, attachmentId) =>
+      http.get<T.ReceiptLink>(
+        `/api/admin/inquiries/${encodeURIComponent(inquiryId)}/attachments/${encodeURIComponent(attachmentId)}`,
+      ),
 
     setInquiryStatus: (inquiryId, status) =>
       http

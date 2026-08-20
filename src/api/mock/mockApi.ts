@@ -303,6 +303,21 @@ export const mockApi: Api = {
       await delay(null)
     },
 
+    getInquiryAttachment: (inquiryId, attachmentId) => {
+      const attachment = state.inquiries
+        .find((inquiry) => inquiry.id === inquiryId)
+        ?.attachments.find((item) => item.id === attachmentId)
+      if (!attachment) return notFound<T.ReceiptLink>('첨부')
+      // 목업에는 S3 가 없어, 이미지면 미리보기가 보이도록 그림을 하나 그려 넘깁니다.
+      const url = attachment.contentType.startsWith('image/')
+        ? 'data:image/svg+xml;utf8,' +
+          encodeURIComponent(
+            `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="270"><rect width="100%" height="100%" fill="#e2e8f0"/><text x="50%" y="50%" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#64748b">${attachment.fileName}</text></svg>`,
+          )
+        : 'about:blank'
+      return delay({ fileName: attachment.fileName, url })
+    },
+
     getNotices: () => delay(state.notices),
 
     createNotice: (input) => {
@@ -382,6 +397,7 @@ export const mockApi: Api = {
           subject: null,
           createdAt: request.createdAt!,
           statusChangedAt: null,
+          attachments: [],
         },
         ...state.inquiries,
       ]
