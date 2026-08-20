@@ -17,6 +17,9 @@ import { bucketLabel, changeRate, number, signedPercent, weekLabels, won, wonSuf
  */
 type View = 'live' | 'daily' | 'weekly' | 'monthly'
 
+/** 막대가 셀 것 — 작업 건수 / 처리 쪽수 */
+type Metric = 'jobs' | 'pages'
+
 const VIEWS = [
   { value: 'live', label: '실시간' },
   { value: 'daily', label: '일간' },
@@ -32,26 +35,44 @@ const KPI_PERIOD: Record<View, Period> = {
   monthly: 'month',
 }
 
-/** 막대가 쓸 workload 구간 (실시간은 overview 를 씁니다) */
-const WORKLOAD_UNIT: Record<Exclude<View, 'live'>, Bucket> = {
-  daily: 'daily',
-  weekly: 'weekly',
-  monthly: 'monthly',
-}
-
-/** 상세 통계(T1-2)로 넘길 때 보던 구간을 그대로 이어 줍니다. */
-const DETAIL_UNIT: Record<View, Bucket> = {
+/** 건수 막대가 쓸 workload 구간 (실시간은 건수를 못 그려서 자리만 채웁니다) */
+const WORKLOAD_UNIT: Record<View, Bucket> = {
   live: 'daily',
   daily: 'daily',
   weekly: 'weekly',
   monthly: 'monthly',
 }
 
-const LEGEND: Record<View, string> = {
-  live: '시간대별 처리 쪽수',
-  daily: '일별 작업 건수',
-  weekly: '주차별 작업 건수',
-  monthly: '월별 작업 건수',
+const BUCKET_LABEL: Record<View, string> = {
+  live: '시간대별',
+  daily: '일별',
+  weekly: '주차별',
+  monthly: '월별',
+}
+
+/**
+ * 구간마다 고를 수 있는 지표가 다릅니다 — 서버가 주는 값이 달라서입니다.
+ *   처리 쪽수 : overview.series 가 today=시간별 / week=일별 까지만 줍니다(주·월 버킷 없음).
+ *   작업 건수 : workload 가 일·주·월만 줍니다(시간별 없음).
+ */
+const CAN_SHOW: Record<View, Record<Metric, boolean>> = {
+  live: { pages: true, jobs: false },
+  daily: { pages: true, jobs: true },
+  weekly: { pages: false, jobs: true },
+  monthly: { pages: false, jobs: true },
+}
+
+const CANNOT_REASON: Record<Metric, string> = {
+  jobs: '시간대별 작업 건수는 서버가 아직 주지 않습니다 (overview.series 에 jobs 없음)',
+  pages: '주차·월 단위 처리 쪽수는 서버가 아직 주지 않습니다 (overview.series 는 일별까지)',
+}
+
+/** 쪽수 막대를 어느 기간에서 가져올지 — 실시간은 시간별, 일간은 일별 */
+const PAGES_PERIOD: Record<View, Period> = {
+  live: 'today',
+  daily: 'week',
+  weekly: 'week',
+  monthly: 'month',
 }
 
 /** 직전 기간을 뭐라고 부를지 — 명세 prevPagesProcessed 는 "직전 기간 전체" 입니다. */
@@ -74,15 +95,23 @@ const PERIODS = [
  */
 export function StatsPage() {
   const [view, setView] = useState<View>('live')
+  const [metric, setMetric] = useState<Metric>('pages')
   /** 누적 원가는 기간과 무관하게 같은 구성으로 내려옵니다(명세) — 탭은 강조할 막대를 고릅니다. */
   const [costPeriod, setCostPeriod] = useState<Period>('today')
 
+  // 고른 지표를 이 구간에서 못 보여주면 되는 쪽으로 넘어갑니다.
+  const shown: Metric = CAN_SHOW[view][metric] ? metric : metric === 'jobs' ? 'pages' : 'jobs'
+
   const overview = useStatsOverview(KPI_PERIOD[view])
-  // 실시간 탭은 overview 의 시간별 시계열만 쓰므로 workload 는 부르지 않습니다.
-  const workload = useWorkload(
-    view === 'live' ? 'daily' : WORKLOAD_UNIT[view],
-    view !== 'live',
-  )
+  // 쪽수 막대는 overview 의 시계열을 씁니다. 기간이 같으면 위 조회와 한 번으로 합쳐집니다.
+  const pagesSource = useStatsOverview(PAGES_PERIOD[view], shown === 'pages')
+  // 건수 막대는 workload 를 씁니다.
+  const workload = useWorkload(WORKLOAD_UNIT[view], shown === 'jobs')
+
+  const metricOptions = [
+    { value: 'jobs' as Metric, label: '건수', disabled: !CAN_SHOW[view].jobs, reason: CANNOT_REASON.jobs },
+    { value: 'pages' as Metric, label: '쪽수', disabled: !CAN_SHOW[view].pages, reason: CANNOT_REASON.pages },
+  ]
 
   return (
     <>
@@ -91,7 +120,8 @@ export function StatsPage() {
         actions={
           <>
             <Segmented value={view} options={VIEWS} onChange={setView} />
-            <Link to={`/admin/stats/detail?unit=${DETAIL_UNIT[view]}`} className="btn">
+            <Segmented value={shown} options={metricOptions} onChange={setMetric} />
+            <Link to="/admin/stats/detail" className="btn">
               상세 보기 ›
             </Link>
           </>
@@ -128,13 +158,13 @@ export function StatsPage() {
           }}
         </Query>
 
-        {/* 실시간 — 오늘 시간별 처리 쪽수 */}
-        {view === 'live' && (
-          <Query state={overview} rows={3}>
+        {/* 처리 쪽수 — overview 의 시계열 */}
+        {shown === 'pages' && (
+          <Query state={pagesSource} rows={3}>
             {(data) => (
               <VBarChart
                 data={data.series.map((point) => ({
-                  label: bucketLabel(point.bucket, 'hour'),
+                  label: bucketLabel(point.bucket, view === 'live' ? 'hour' : 'day'),
                   primary: point.pages,
                   caption: `${number(point.pages)}쪽`,
                 }))}
@@ -143,8 +173,8 @@ export function StatsPage() {
           </Query>
         )}
 
-        {/* 일간 · 주간 · 월간 — 작업 건수(완료 / 실패·취소) */}
-        {view !== 'live' && (
+        {/* 작업 건수 — workload 의 완료 / 실패·취소 */}
+        {shown === 'jobs' && (
           <Query state={workload} rows={3}>
             {(data) => {
               const labels =
@@ -169,10 +199,10 @@ export function StatsPage() {
         )}
 
         <div className="legend">
-          {view === 'live' ? (
+          {shown === 'pages' ? (
             <span className="legend__item">
               <i className="legend__swatch" />
-              {LEGEND[view]}
+              {BUCKET_LABEL[view]} 처리 쪽수
             </span>
           ) : (
             <>
@@ -184,7 +214,7 @@ export function StatsPage() {
                 <i className="legend__swatch legend__swatch--danger" />
                 실패·취소
               </span>
-              <span className="legend__spacer">{LEGEND[view]}</span>
+              <span className="legend__spacer">{BUCKET_LABEL[view]} 작업 건수</span>
             </>
           )}
         </div>

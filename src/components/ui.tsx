@@ -46,7 +46,8 @@ export function Segmented<V extends string>({
   onChange,
 }: {
   value: V
-  options: ReadonlyArray<{ value: V; label: string }>
+  /** disabled 를 주면 왜 못 고르는지 title 로 알려 줍니다. */
+  options: ReadonlyArray<{ value: V; label: string; disabled?: boolean; reason?: string }>
   onChange: (value: V) => void
 }) {
   return (
@@ -57,6 +58,8 @@ export function Segmented<V extends string>({
           type="button"
           role="tab"
           aria-selected={option.value === value}
+          disabled={option.disabled}
+          title={option.disabled ? option.reason : undefined}
           className={`segmented__item ${option.value === value ? 'segmented__item--active' : ''}`}
           onClick={() => onChange(option.value)}
         >

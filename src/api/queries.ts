@@ -51,8 +51,12 @@ export const qk = {
 }
 
 /* ── T1-1 ── */
-export const useStatsOverview = (period: Period) =>
-  useQuery({ queryKey: qk.statsOverview(period), queryFn: () => api.admin.getStatsOverview(period) })
+export const useStatsOverview = (period: Period, enabled = true) =>
+  useQuery({
+    queryKey: qk.statsOverview(period),
+    queryFn: () => api.admin.getStatsOverview(period),
+    enabled,
+  })
 
 /* ── T1-2 ── */
 export const useWorkload = (unit: Bucket, enabled = true) =>

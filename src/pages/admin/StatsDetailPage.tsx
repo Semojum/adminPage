@@ -1,10 +1,7 @@
 import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import type { Bucket } from '@/api/types'
-import { useLayoutCost, useProfitability, useWorkload } from '@/api/queries'
-import { Badge, Card, HBarChart, Query, Segmented, VBarChart } from '@/components/ui'
+import { useLayoutCost, useProfitability } from '@/api/queries'
+import { Badge, Card, HBarChart, Query } from '@/components/ui'
 import {
-  bucketLabel,
   contractTypeLabel,
   fillLayoutCost,
   isPaidContract,
@@ -13,32 +10,8 @@ import {
   number,
   signedPercent,
   signedWon,
-  weekLabels,
   won,
 } from '@/lib/format'
-
-const BUCKETS = [
-  { value: 'daily', label: '일별' },
-  { value: 'weekly', label: '주간' },
-  { value: 'monthly', label: '월별' },
-  { value: 'all', label: '전체' },
-] as const satisfies ReadonlyArray<{ value: Bucket; label: string }>
-
-/**
- * 막대 라벨 단위 — daily 는 날짜, monthly·all 은 달.
- * weekly 는 "8월 1주" 처럼 주차로 적어야 해서 따로 만듭니다(weekLabels).
- */
-const AXIS_UNIT: Record<Bucket, 'day' | 'month'> = {
-  daily: 'day',
-  weekly: 'day',
-  monthly: 'month',
-  all: 'month',
-}
-
-const BUCKET_VALUES = BUCKETS.map((bucket) => bucket.value)
-
-const isBucket = (value: string | null): value is Bucket =>
-  value !== null && (BUCKET_VALUES as string[]).includes(value)
 
 /** 최근 여섯 달. 서버에 월 목록 API 가 없어 화면이 만듭니다. */
 function recentMonths(count = 6): string[] {
@@ -78,70 +51,19 @@ function MonthSelect({
 /**
  * AD-T1-2 · 상세 통계 (T1-1 의 [상세 보기])
  *
- * GET /api/admin/stats/workload · /layout-cost · /profitability
+ * GET /api/admin/stats/layout-cost · /profitability
+ * 작업량 그래프는 T1-1 [전체 작업 현황] 이 실시간·일간·주간·월간으로 다루므로 여기서는 뺐습니다.
  */
 export function StatsDetailPage() {
   const months = useMemo(() => recentMonths(), [])
-  const [searchParams, setSearchParams] = useSearchParams()
-
-  /**
-   * 작업량 구간은 주소로 받습니다.
-   * T1-1 에서 보던 기간(오늘/주간/월별)이 [상세 보기] 로 그대로 이어지고,
-   * 새로고침하거나 주소를 공유해도 같은 구간이 열립니다.
-   */
-  const unitParam = searchParams.get('unit')
-  const unit: Bucket = isBucket(unitParam) ? unitParam : 'weekly'
-  const setUnit = (next: Bucket) => {
-    searchParams.set('unit', next)
-    setSearchParams(searchParams, { replace: true })
-  }
-
   const [layoutMonth, setLayoutMonth] = useState(months[0])
   const [profitMonth, setProfitMonth] = useState(months[0])
 
-  const workload = useWorkload(unit)
   const layout = useLayoutCost(layoutMonth)
   const profit = useProfitability(profitMonth)
 
   return (
     <>
-      <Card title="작업량" actions={<Segmented value={unit} options={BUCKETS} onChange={setUnit} />}>
-        <Query state={workload} rows={4}>
-          {(data) => {
-            const labels =
-              data.unit === 'weekly'
-                ? weekLabels(data.buckets.map((point) => point.bucket))
-                : data.buckets.map((point) => bucketLabel(point.bucket, AXIS_UNIT[data.unit] ?? 'day'))
-
-            return (
-            <>
-              <VBarChart
-                tone="status"
-                data={data.buckets.map((point, index) => ({
-                  label: labels[index],
-                  primary: point.completed,
-                  secondary: point.failedOrCanceled,
-                  // 막대 위 합계는 화면이 더합니다. (명세 §workload)
-                  caption: `${number(point.completed + point.failedOrCanceled)}건`,
-                }))}
-              />
-              <div className="legend">
-                <span className="legend__item">
-                  <i className="legend__swatch legend__swatch--ok" />
-                  완료
-                </span>
-                <span className="legend__item">
-                  <i className="legend__swatch legend__swatch--danger" />
-                  실패·취소
-                </span>
-                <span className="legend__spacer">막대 위 숫자는 합계입니다</span>
-              </div>
-            </>
-            )
-          }}
-        </Query>
-      </Card>
-
       <Card
         title="레이아웃 유형별 평균 원가"
         actions={<MonthSelect months={months} value={layoutMonth} onChange={setLayoutMonth} />}
