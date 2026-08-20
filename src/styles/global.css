@@ -1266,19 +1266,54 @@ textarea {
   font-weight: 500;
 }
 
-/* 쪽 이동 */
-.io-pager {
+/* 쪽 이동 — 앱의 Pagination 과 같은 모양 */
+.pager {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-}
-
-.io-pager__count {
+  gap: 6px;
   font-size: 13px;
   font-weight: 600;
   color: var(--sub);
-  font-variant-numeric: tabular-nums;
+}
+
+.pager__step,
+.pager__page {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  font: inherit;
+  color: var(--sub);
+  transition: background 0.15s, color 0.15s;
+}
+
+.pager__step:hover:not(:disabled),
+.pager__page:hover:not(.pager__page--active) {
+  background: var(--line-2);
+  color: var(--ink);
+}
+
+.pager__step:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pager__pages {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pager__page--active {
+  background: #5a8fbb;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(90, 143, 187, 0.35);
 }
 
 /* 미리보기(T1-5) */

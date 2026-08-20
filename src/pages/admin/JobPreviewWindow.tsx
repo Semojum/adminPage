@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import type { PageTextItem } from '@/api/types'
 import { useJobPage, useSendJobToMyPage } from '@/api/queries'
-import { ErrorBox, Loading } from '@/components/ui'
+import { ErrorBox, Loading, Pagination } from '@/components/ui'
 import { useToast } from '@/components/Toast'
 import { WindowShell } from '@/layouts/WindowShell'
 import { resultFormat } from '@/lib/format'
@@ -134,8 +134,7 @@ export function JobPreviewWindow() {
           <header className="io-panel__head">
             <h2 className="io-panel__title">점역/번역 결과</h2>
             <span className="io-panel__meta">
-              {resultFileName} · {format}
-              {format === 'BRF' ? ' (점역·통합 변환)' : ' (OCR 변환)'}
+              {resultFileName} · {format} · {data.pageNo}/{data.totalPages}쪽
             </span>
           </header>
           <div className="io-panel__body">
@@ -156,30 +155,16 @@ export function JobPreviewWindow() {
         </section>
       </div>
 
-      <div className="io-pager">
-        <button
-          type="button"
-          className="btn btn--sm"
-          disabled={pageNo <= 1}
-          onClick={() => setPageNo((value) => Math.max(1, value - 1))}
-        >
-          ‹ 이전 쪽
-        </button>
-        <span className="io-pager__count">
-          {data.pageNo} / {data.totalPages}
-        </span>
-        <button
-          type="button"
-          className="btn btn--sm"
-          disabled={pageNo >= data.totalPages}
-          onClick={() => setPageNo((value) => Math.min(data.totalPages, value + 1))}
-        >
-          다음 쪽 ›
-        </button>
-      </div>
+      {/* 쪽을 옮기면 원본과 결과가 같이 움직입니다 — 한 번의 조회로 둘 다 받습니다. */}
+      <Pagination
+        currentPage={data.pageNo}
+        totalPages={data.totalPages}
+        onPageChange={(next) => setPageNo(Math.min(Math.max(1, next), data.totalPages))}
+      />
 
       <p className="notice-box">
-        이 창은 <strong>확인용</strong>입니다. 편집이나 재변환은 하지 않습니다. 자세히 보려면 마이페이지로
+        원본과 결과는 <strong>같은 쪽</strong>을 봅니다 — 아래에서 쪽을 옮기면 둘 다 함께 움직입니다.
+        이 창은 <strong>확인용</strong>이라 편집이나 재변환은 하지 않습니다. 자세히 보려면 마이페이지로
         보내 앱에서 엽니다.
       </p>
     </WindowShell>

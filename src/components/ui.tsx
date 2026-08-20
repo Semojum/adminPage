@@ -249,6 +249,86 @@ export function HBarChart({ data }: { data: HBarDatum[] }) {
   )
 }
 
+/* ─────────────── 쪽 이동 ─────────────── */
+
+/**
+ * 번호식 쪽 이동. 세모점 앱(FE)의 Pagination 을 그대로 옮겼습니다.
+ * 열 개씩 묶어 보여주고 « » 로 묶음을 건너뜁니다.
+ */
+export function Pagination({
+  currentPage,
+  totalPages,
+  onPageChange,
+  limit = 10,
+}: {
+  currentPage: number
+  totalPages: number
+  onPageChange: (page: number) => void
+  limit?: number
+}) {
+  if (totalPages <= 1) return null
+
+  const startPage = (Math.ceil(currentPage / limit) - 1) * limit + 1
+  const endPage = Math.min(startPage + limit - 1, totalPages)
+  const pages = Array.from({ length: Math.max(0, endPage - startPage + 1) }, (_, i) => startPage + i)
+
+  return (
+    <nav className="pager" aria-label="쪽 이동">
+      <button
+        type="button"
+        className="pager__step"
+        disabled={startPage <= 1}
+        onClick={() => onPageChange(Math.max(startPage - limit, 1))}
+        aria-label="이전 10쪽"
+      >
+        «
+      </button>
+      <button
+        type="button"
+        className="pager__step"
+        disabled={currentPage <= 1}
+        onClick={() => onPageChange(currentPage - 1)}
+        aria-label="이전 쪽"
+      >
+        ‹
+      </button>
+
+      <div className="pager__pages">
+        {pages.map((page) => (
+          <button
+            key={page}
+            type="button"
+            className={`pager__page ${page === currentPage ? 'pager__page--active' : ''}`}
+            aria-current={page === currentPage ? 'page' : undefined}
+            onClick={() => onPageChange(page)}
+          >
+            {page}
+          </button>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        className="pager__step"
+        disabled={currentPage >= totalPages}
+        onClick={() => onPageChange(currentPage + 1)}
+        aria-label="다음 쪽"
+      >
+        ›
+      </button>
+      <button
+        type="button"
+        className="pager__step"
+        disabled={endPage >= totalPages}
+        onClick={() => onPageChange(Math.min(endPage + 1, totalPages))}
+        aria-label="다음 10쪽"
+      >
+        »
+      </button>
+    </nav>
+  )
+}
+
 /* ─────────────── 정의 목록 ─────────────── */
 
 export function Defs({ children }: { children: ReactNode }) {
