@@ -10,7 +10,7 @@ import {
   useUpdateOrg,
 } from '@/api/queries'
 import { api } from '@/api'
-import { Badge, Card, ErrorBox, Loading, Meter } from '@/components/ui'
+import { Badge, Card, ErrorBox, Loading, Meter, queryFallback } from '@/components/ui'
 import { Modal } from '@/components/Modal'
 import { useToast } from '@/components/Toast'
 import { WindowShell } from '@/layouts/WindowShell'
@@ -64,19 +64,18 @@ export function OrgInfoWindow() {
     })
   }, [org.data])
 
-  if (org.isPending || !form) {
+  if (!orgId) {
     return (
       <div className="window">
-        <Loading rows={6} />
+        <ErrorBox error={new Error('기관 ID 가 없습니다. 목록에서 다시 열어 주세요.')} />
       </div>
     )
   }
-  if (org.error || !org.data) {
-    return (
-      <div className="window">
-        <ErrorBox error={org.error} onRetry={org.refetch} />
-      </div>
-    )
+  // 에러·중단을 로딩보다 먼저 봅니다 — 조회가 실패하면 form 이 끝내 채워지지 않아
+  // 로딩 분기에 갇히고 이유가 영영 안 보입니다.
+  const fallback = queryFallback(org, 6)
+  if (fallback || !org.data || !form) {
+    return <div className="window">{fallback ?? <Loading rows={6} />}</div>
   }
 
   const data = org.data

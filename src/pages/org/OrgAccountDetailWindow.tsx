@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom'
 import { useOrgAccountJobs, useOrgAccounts, useOrgDashboard } from '@/api/queries'
-import { Badge, Card, ErrorBox, Loading, Meter } from '@/components/ui'
+import { Badge, Card, Loading, Meter, queryFallback } from '@/components/ui'
 import { WindowShell } from '@/layouts/WindowShell'
 import { date, jobStatusText, jobStatusTone, number, shortDate, usageRate } from '@/lib/format'
 
@@ -16,19 +16,10 @@ export function OrgAccountDetailWindow() {
   const dashboard = useOrgDashboard()
   const accounts = useOrgAccounts()
 
-  if (jobs.isPending) {
-    return (
-      <div className="window">
-        <Loading rows={5} />
-      </div>
-    )
-  }
-  if (jobs.error || !jobs.data) {
-    return (
-      <div className="window">
-        <ErrorBox error={jobs.error} onRetry={jobs.refetch} />
-      </div>
-    )
+  // 에러·중단(오프라인)을 로딩보다 먼저 봅니다 — 이유 없이 스켈레톤만 도는 걸 막습니다.
+  const fallback = queryFallback(jobs, 5)
+  if (fallback || !jobs.data) {
+    return <div className="window">{fallback ?? <Loading rows={5} />}</div>
   }
 
   const data = jobs.data

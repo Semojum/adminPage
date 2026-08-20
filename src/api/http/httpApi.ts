@@ -11,6 +11,18 @@ import { getStoredSession, setStoredSession } from './session'
  * `{items: []}` 로 줄 때가 섞여 있어, 화면이 흔들리지 않도록 여기서만 다듬습니다.
  */
 
+/**
+ * 기관 ID 를 찾아냅니다.
+ *
+ * 명세 예시는 목록이 `orgId`, 생성 응답이 `organizationId` 로 서로 다릅니다.
+ * 어느 쪽이 와도 화면이 같은 이름으로 쓰도록 여기서 맞춰 둡니다 —
+ * 비어 있으면 기관 정보 창이 열려도 조회할 대상이 없습니다.
+ */
+function orgIdOf(raw: unknown): string {
+  const value = raw as { orgId?: string; organizationId?: string; id?: string } | null
+  return value?.orgId ?? value?.organizationId ?? value?.id ?? ''
+}
+
 /** 배열이든 {items:[]} 든 배열로 맞춰 줍니다. */
 function list<V>(value: unknown): V[] {
   if (Array.isArray(value)) return value as V[]
@@ -117,11 +129,18 @@ export const httpApi: Api = {
         })
         .then(() => undefined),
 
-    getOrgs: (month) => http.get<T.AdminOrgList>('/api/admin/orgs', { month }),
+    getOrgs: (month) =>
+      http.get<T.AdminOrgList>('/api/admin/orgs', { month }).then((result) => ({
+        month: result?.month ?? '',
+        items: list<T.AdminOrgRow>(result).map((org) => ({ ...org, orgId: orgIdOf(org) })),
+      })),
 
     createOrg: (input) => http.post<T.CreatedOrg>('/api/admin/orgs', input),
 
-    getOrg: (orgId) => http.get<T.OrgDetail>(`/api/admin/orgs/${encodeURIComponent(orgId)}`),
+    getOrg: (orgId) =>
+      http
+        .get<T.OrgDetail>(`/api/admin/orgs/${encodeURIComponent(orgId)}`)
+        .then((result) => ({ ...result, orgId: orgIdOf(result) || orgId })),
 
     updateOrg: (orgId, patch) =>
       http.patch<T.OrgDetail>(`/api/admin/orgs/${encodeURIComponent(orgId)}`, patch),

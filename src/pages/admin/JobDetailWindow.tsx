@@ -1,7 +1,7 @@
 import { useParams } from 'react-router-dom'
 import type { LayoutType } from '@/api/types'
 import { useJob } from '@/api/queries'
-import { Badge, Card, Def, Defs, ErrorBox, Loading } from '@/components/ui'
+import { Badge, Card, Def, Defs, Loading, queryFallback } from '@/components/ui'
 import { WindowShell } from '@/layouts/WindowShell'
 import {
   dateTime,
@@ -26,19 +26,10 @@ export function JobDetailWindow() {
   const { jobId = '' } = useParams()
   const job = useJob(jobId)
 
-  if (job.isPending) {
-    return (
-      <div className="window">
-        <Loading rows={6} />
-      </div>
-    )
-  }
-  if (job.error || !job.data) {
-    return (
-      <div className="window">
-        <ErrorBox error={job.error} onRetry={job.refetch} />
-      </div>
-    )
+  // 에러·중단(오프라인)을 로딩보다 먼저 봅니다 — 이유 없이 스켈레톤만 도는 걸 막습니다.
+  const fallback = queryFallback(job, 6)
+  if (fallback || !job.data) {
+    return <div className="window">{fallback ?? <Loading rows={6} />}</div>
   }
 
   const data = job.data

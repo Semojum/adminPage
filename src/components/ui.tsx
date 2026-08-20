@@ -370,18 +370,48 @@ export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => v
   )
 }
 
+/**
+ * 조회 상태.
+ *
+ * fetchStatus 가 'paused' 면 브라우저가 오프라인이라고 판단해 요청이 멈춘 것입니다.
+ * 이때 status 는 계속 'pending' 이라, 그냥 두면 화면이 영원히 스켈레톤만 돕니다.
+ */
+export interface QueryState<V> {
+  data: V | undefined
+  isPending: boolean
+  error: unknown
+  refetch: () => void
+  fetchStatus?: 'fetching' | 'paused' | 'idle'
+}
+
+export const PAUSED_MESSAGE = '네트워크 연결이 끊겨 요청이 멈췄습니다. 연결을 확인한 뒤 다시 시도해 주세요.'
+
+/**
+ * 못 그리는 이유가 있으면 그 이유를 돌려줍니다. 그릴 수 있으면 null.
+ * 순서가 중요합니다 — 에러를 로딩보다 먼저 봐야 에러가 로딩에 가려지지 않습니다.
+ */
+export function queryFallback<V>(state: QueryState<V>, rows?: number): ReactNode | null {
+  if (state.error) return <ErrorBox error={state.error} onRetry={state.refetch} />
+  if (state.fetchStatus === 'paused') {
+    return <ErrorBox error={new Error(PAUSED_MESSAGE)} onRetry={state.refetch} />
+  }
+  if (state.isPending) return <Loading rows={rows} />
+  if (state.data === undefined) return null
+  return null
+}
+
 /** 로딩/에러/성공 세 갈래를 한 곳에서 처리합니다. */
 export function Query<V>({
   state,
   rows,
   children,
 }: {
-  state: { data: V | undefined; isPending: boolean; error: unknown; refetch: () => void }
+  state: QueryState<V>
   rows?: number
   children: (data: V) => ReactNode
 }) {
-  if (state.isPending) return <Loading rows={rows} />
-  if (state.error) return <ErrorBox error={state.error} onRetry={state.refetch} />
+  const fallback = queryFallback(state, rows)
+  if (fallback !== null) return <>{fallback}</>
   if (state.data === undefined) return null
   return <>{children(state.data)}</>
 }

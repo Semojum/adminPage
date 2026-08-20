@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import type { PageTextItem } from '@/api/types'
 import { useJobPage, useSendJobToMyPage } from '@/api/queries'
-import { ErrorBox, Loading, Pagination } from '@/components/ui'
+import { Loading, Pagination, queryFallback } from '@/components/ui'
 import { useToast } from '@/components/Toast'
 import { WindowShell } from '@/layouts/WindowShell'
 import { resultFormat } from '@/lib/format'
@@ -49,19 +49,10 @@ export function JobPreviewWindow() {
   const send = useSendJobToMyPage()
   const toast = useToast()
 
-  if (page.isPending) {
-    return (
-      <div className="window">
-        <Loading rows={6} />
-      </div>
-    )
-  }
-  if (page.error || !page.data) {
-    return (
-      <div className="window">
-        <ErrorBox error={page.error} onRetry={page.refetch} />
-      </div>
-    )
+  // 에러·중단(오프라인)을 로딩보다 먼저 봅니다 — 이유 없이 스켈레톤만 도는 걸 막습니다.
+  const fallback = queryFallback(page, 6)
+  if (fallback || !page.data) {
+    return <div className="window">{fallback ?? <Loading rows={6} />}</div>
   }
 
   const data = page.data

@@ -13,8 +13,14 @@ function delay<V>(value: V): Promise<V> {
   return new Promise((resolve) => setTimeout(() => resolve(copy), LATENCY))
 }
 
-function notFound(what: string): never {
-  throw new Error(`${what}을(를) 찾을 수 없습니다.`)
+/**
+ * 없는 것을 찾았을 때.
+ *
+ * **비동기로 거절합니다** — 실제 HTTP 는 언제나 거절된 약속으로 돌아옵니다.
+ * 동기로 throw 하면 화면이 실제와 다르게 동작해(에러 상태로 안 내려감) 검증이 어긋납니다.
+ */
+function notFound<V>(what: string): Promise<V> {
+  return Promise.reject(new Error(`${what}을(를) 찾을 수 없습니다.`))
 }
 
 /* 목업은 메모리 상태를 들고 있어서 등록·잠금 같은 조작이 화면에 반영됩니다. */
@@ -110,7 +116,7 @@ export const mockApi: Api = {
       return delay({ since: new Date(Date.now() - 24 * 3_600_000).toISOString(), items })
     },
 
-    getJob: (jobId) => delay(fx.jobDetails[jobId] ?? notFound('작업')),
+    getJob: (jobId) => (fx.jobDetails[jobId] ? delay(fx.jobDetails[jobId]) : notFound('작업')),
 
     getJobPage: (jobId, pageNo) => delay({ ...fx.jobPage, jobId, pageNo }),
 
@@ -149,10 +155,11 @@ export const mockApi: Api = {
       return delay({ organizationId: orgId, name: input.name, code })
     },
 
-    getOrg: (orgId) => delay(state.orgDetails[orgId] ?? notFound('기관')),
+    getOrg: (orgId) => (state.orgDetails[orgId] ? delay(state.orgDetails[orgId]) : notFound('기관')),
 
     updateOrg: (orgId, patch) => {
-      const detail = state.orgDetails[orgId] ?? notFound('기관')
+      const detail = state.orgDetails[orgId]
+      if (!detail) return notFound('기관')
       Object.assign(detail, {
         ...patch,
         creditRemaining:
@@ -173,7 +180,8 @@ export const mockApi: Api = {
     },
 
     createAccounts: ({ organizationId, count }) => {
-      const org = state.orgs.find((item) => item.orgId === organizationId) ?? notFound('기관')
+      const org = state.orgs.find((item) => item.orgId === organizationId)
+      if (!org) return notFound('기관')
       const detail = state.orgDetails[organizationId]
       const issued: T.IssuedCredential[] = []
 
@@ -269,7 +277,8 @@ export const mockApi: Api = {
     },
 
     updateOrder: (orderId, patch) => {
-      const order = state.orders.find((item) => item.id === orderId) ?? notFound('주문')
+      const order = state.orders.find((item) => item.id === orderId)
+      if (!order) return notFound('주문')
       if (patch.paidAt !== undefined) order.paidAt = patch.paidAt
       if (patch.invoiceStatus !== undefined) order.invoiceStatus = patch.invoiceStatus
       return delay(order)
@@ -277,7 +286,7 @@ export const mockApi: Api = {
 
     getOrderReceipt: (orderId) => {
       const order = state.orders.find((item) => item.id === orderId)
-      if (!order?.receiptFileName) notFound('증빙')
+      if (!order?.receiptFileName) return notFound<T.ReceiptLink>('증빙')
       // 목업에는 S3 가 없어 빈 PDF 를 만들어 넘깁니다.
       return delay({ fileName: order.receiptFileName, url: 'about:blank' })
     },
@@ -292,7 +301,8 @@ export const mockApi: Api = {
       ),
 
     setInquiryStatus: async (inquiryId, status) => {
-      const inquiry = state.inquiries.find((item) => item.id === inquiryId) ?? notFound('문의')
+      const inquiry = state.inquiries.find((item) => item.id === inquiryId)
+      if (!inquiry) return notFound<void>('문의')
       inquiry.status = status
       inquiry.statusChangedAt = nowIso()
       await delay(null)
@@ -326,14 +336,16 @@ export const mockApi: Api = {
     getAccounts: (month) => delay({ month: month ?? fx.THIS_MONTH, items: state.orgAccounts }),
 
     setAccountAlias: async (loginId, alias) => {
-      const account = state.orgAccounts.find((item) => item.loginId === loginId) ?? notFound('계정')
+      const account = state.orgAccounts.find((item) => item.loginId === loginId)
+      if (!account) return notFound<void>('계정')
       account.alias = alias?.trim() ? alias.trim() : null
       await delay(null)
     },
 
     setAccountLocked: (loginId, locked) => {
-      const account = state.orgAccounts.find((item) => item.loginId === loginId) ?? notFound('계정')
-      if (account.self) throw new Error('본인 계정은 잠글 수 없습니다.')
+      const account = state.orgAccounts.find((item) => item.loginId === loginId)
+      if (!account) return notFound<{ canceledJobs: number }>('계정')
+      if (account.self) return Promise.reject(new Error('본인 계정은 잠글 수 없습니다.'))
       account.status = locked ? 'INACTIVE' : 'ACTIVE'
       return delay({ canceledJobs: locked ? 1 : 0 })
     },
@@ -401,7 +413,7 @@ export const mockApi: Api = {
 
     getOrderReceipt: (orderId) => {
       const order = state.orders.find((item) => item.id === orderId)
-      if (!order?.receiptFileName) notFound('증빙')
+      if (!order?.receiptFileName) return notFound<T.ReceiptLink>('증빙')
       return delay({ fileName: order.receiptFileName, url: 'about:blank' })
     },
   },
