@@ -247,6 +247,47 @@ export const layoutLabel: Record<LayoutType, string> = {
   PAGE_LAYOUT_UNSPECIFIED: '미분류',
 }
 
+/**
+ * 레이아웃 원가에서 항상 자리를 지키는 네 유형.
+ * 서버는 **성공 쪽만 집계**해서(명세 §layout-cost) 그 달에 안 나온 유형은 응답에서 빠집니다.
+ * 그대로 그리면 달마다 줄 수가 달라져 비교가 안 되므로 빠진 유형은 0으로 채웁니다.
+ */
+export const COST_LAYOUTS: LayoutType[] = [
+  'PAGE_LAYOUT_VISUAL',
+  'PAGE_LAYOUT_TABLE',
+  'PAGE_LAYOUT_FORMULA',
+  'PAGE_LAYOUT_TEXT',
+]
+
+export interface LayoutCostLike {
+  layoutType: LayoutType
+  pages: number
+  sharePct: number
+  avgKrwPerPage: number
+  pagesDeltaPct: number | null
+}
+
+/** 빠진 유형을 0으로 채우고 비싼 순으로 세웁니다(명세: 평균 원가 비싼 순). */
+export function fillLayoutCost<T extends LayoutCostLike>(items: T[]): LayoutCostLike[] {
+  const byType = new Map(items.map((item) => [item.layoutType, item as LayoutCostLike]))
+
+  const filled: LayoutCostLike[] = COST_LAYOUTS.map(
+    (layoutType) =>
+      byType.get(layoutType) ?? {
+        layoutType,
+        pages: 0,
+        sharePct: 0,
+        avgKrwPerPage: 0,
+        pagesDeltaPct: null,
+      },
+  )
+
+  // 서버가 미분류(UNSPECIFIED) 같은 다른 유형을 주면 뒤에 붙입니다.
+  const extras = items.filter((item) => !COST_LAYOUTS.includes(item.layoutType))
+
+  return [...filled, ...extras].sort((a, b) => b.avgKrwPerPage - a.avgKrwPerPage)
+}
+
 /** T1-2 막대는 "그림·시각"처럼 조금 더 길게 적습니다. */
 export const layoutLongLabel: Record<LayoutType, string> = {
   PAGE_LAYOUT_TEXT: '본문 위주',

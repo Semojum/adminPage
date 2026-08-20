@@ -10,7 +10,7 @@ import {
 import { Badge, Card, Query } from '@/components/ui'
 import { ConfirmModal, Modal } from '@/components/Modal'
 import { useToast } from '@/components/Toast'
-import { accountStatusLabel, contractTypeLabel, lastLogin, number } from '@/lib/format'
+import { CONTRACT_TYPES, accountStatusLabel, contractTypeLabel, lastLogin, number } from '@/lib/format'
 import { openWindow } from '@/lib/openWindow'
 
 type Confirm = { title: string; message: string; confirmLabel: string; danger: boolean; run: () => void }
@@ -322,19 +322,26 @@ function IssuedModal({
 function CreateOrgModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const createOrg = useCreateOrg()
   const toast = useToast()
-  const [form, setForm] = useState({ name: '', code: '', contractExpiresAt: '' })
+  const [form, setForm] = useState({
+    name: '',
+    code: '',
+    // 서버 기본값과 같은 값에서 시작합니다(명세 §기관 생성: 신규 기관 기본 FREE).
+    contractType: 'FREE' as ContractType,
+    contractExpiresAt: '',
+  })
 
   const submit = () => {
     createOrg.mutate(
       {
         name: form.name,
         code: form.code || undefined,
+        contractType: form.contractType,
         contractExpiresAt: form.contractExpiresAt || undefined,
       },
       {
         onSuccess: (created) => {
           toast(`${created.name}(${created.code}) 기관을 발급했습니다.`)
-          setForm({ name: '', code: '', contractExpiresAt: '' })
+          setForm({ name: '', code: '', contractType: 'FREE', contractExpiresAt: '' })
           onClose()
         },
       },
@@ -381,6 +388,20 @@ function CreateOrgModal({ open, onClose }: { open: boolean; onClose: () => void 
           />
         </div>
         <div className="field">
+          <span className="field__label">계약 유형</span>
+          <select
+            className="select"
+            value={form.contractType}
+            onChange={(event) => setForm({ ...form, contractType: event.target.value as ContractType })}
+          >
+            {CONTRACT_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {contractTypeLabel[type]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
           <span className="field__label">계약 만료일</span>
           <input
             className="input"
@@ -391,8 +412,7 @@ function CreateOrgModal({ open, onClose }: { open: boolean; onClose: () => void 
         </div>
         <p className="card__note">
           코드는 소문자 영숫자 2~12자(첫 글자 영문)이고 계정 ID 앞머리가 됩니다 — kblib → kblib01.
-          계약 유형은 신규 기관 기본값 <strong>{contractTypeLabel.FREE}</strong> 로 시작하고, 기관 정보
-          창에서 바꿉니다.
+          할당 크레딧과 계약 시작일은 기관 정보 창에서 채웁니다.
         </p>
       </div>
     </Modal>

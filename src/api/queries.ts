@@ -3,6 +3,7 @@ import { api } from './index'
 import type {
   AccountStatus,
   Bucket,
+  ContractType,
   CreateAccountInput,
   CreateNoticeInput,
   CreateOrderInput,
@@ -97,10 +98,23 @@ export const useSendJobToMyPage = () =>
 export const useOrgs = (month?: string) =>
   useQuery({ queryKey: qk.orgs(month), queryFn: () => api.admin.getOrgs(month) })
 
+/**
+ * 기관 발급.
+ *
+ * 생성 API(POST /api/admin/orgs)는 계약 유형을 받지 않습니다 — 신규 기관은 서버가 FREE 로 만듭니다.
+ * 화면에서 유형을 골랐으면 만든 직후 PATCH 로 이어 붙입니다(발급 한 번에 끝나 보이도록).
+ */
 export const useCreateOrg = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (input: CreateOrgInput) => api.admin.createOrg(input),
+    mutationFn: async (input: CreateOrgInput & { contractType?: ContractType }) => {
+      const { contractType, ...createInput } = input
+      const created = await api.admin.createOrg(createInput)
+      if (contractType && contractType !== 'FREE') {
+        await api.admin.updateOrg(created.organizationId, { contractType })
+      }
+      return created
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.orgsAll }),
   })
 }

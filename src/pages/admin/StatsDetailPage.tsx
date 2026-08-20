@@ -6,6 +6,7 @@ import { Badge, Card, HBarChart, Query, Segmented, VBarChart } from '@/component
 import {
   bucketLabel,
   contractTypeLabel,
+  fillLayoutCost,
   isPaidContract,
   layoutLongLabel,
   monthLabel,
@@ -146,15 +147,18 @@ export function StatsDetailPage() {
         actions={<MonthSelect months={months} value={layoutMonth} onChange={setLayoutMonth} />}
       >
         <Query state={layout} rows={4}>
-          {(data) => (
+          {(data) => {
+            // 그 달에 안 나온 유형도 자리를 지킵니다 — 달마다 줄 수가 달라지면 비교가 안 됩니다.
+            const items = fillLayoutCost(data.items)
+            return (
             <div className="grid-2">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {/* 서버가 비싼 순으로 정렬해 내려줍니다. */}
                 <HBarChart
-                  data={data.items.map((row) => ({
+                  data={items.map((row) => ({
                     label: layoutLongLabel[row.layoutType],
                     value: row.avgKrwPerPage,
-                    display: `${number(Math.round(row.avgKrwPerPage))}원/쪽`,
+                    display:
+                      row.pages === 0 ? '처리 없음' : `${number(Math.round(row.avgKrwPerPage))}원/쪽`,
                   }))}
                 />
                 <p className="card__note">비싼 순으로 정렬 — 요금 설계의 근거</p>
@@ -172,7 +176,7 @@ export function StatsDetailPage() {
                   </thead>
                   <tbody>
                     {/* 표는 비중이 큰 순으로 봅니다. 막대는 비싼 순이라 정렬 기준이 다릅니다. */}
-                    {[...data.items]
+                    {[...items]
                       .sort((a, b) => b.sharePct - a.sharePct)
                       .map((row) => (
                         <tr key={row.layoutType}>
@@ -203,7 +207,8 @@ export function StatsDetailPage() {
                 </table>
               </div>
             </div>
-          )}
+            )
+          }}
         </Query>
       </Card>
 
