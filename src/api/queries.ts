@@ -55,8 +55,8 @@ export const useStatsOverview = (period: Period) =>
   useQuery({ queryKey: qk.statsOverview(period), queryFn: () => api.admin.getStatsOverview(period) })
 
 /* ── T1-2 ── */
-export const useWorkload = (unit: Bucket) =>
-  useQuery({ queryKey: qk.workload(unit), queryFn: () => api.admin.getWorkload(unit) })
+export const useWorkload = (unit: Bucket, enabled = true) =>
+  useQuery({ queryKey: qk.workload(unit), queryFn: () => api.admin.getWorkload(unit), enabled })
 
 export const useLayoutCost = (month: string) =>
   useQuery({ queryKey: qk.layoutCost(month), queryFn: () => api.admin.getLayoutCost(month) })
