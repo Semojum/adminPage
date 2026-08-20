@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Bucket, Period } from '@/api/types'
 import { useStatsOverview, useWorkload } from '@/api/queries'
-import { Card, HBarChart, Query, Segmented, VBarChart } from '@/components/ui'
-import { bucketLabel, changeRate, number, signedPercent, weekLabels, won, wonSuffix } from '@/lib/format'
+import { Card, Query, Segmented, VBarChart } from '@/components/ui'
+import { bucketLabel, changeRate, number, signedPercent, weekLabels } from '@/lib/format'
 
 /**
  * 전체 작업 현황 탭.
@@ -82,12 +82,6 @@ const PREVIOUS_LABEL: Record<Period, string> = {
   month: '지난달',
 }
 
-const PERIODS = [
-  { value: 'today', label: '오늘' },
-  { value: 'week', label: '주간' },
-  { value: 'month', label: '월별' },
-] as const satisfies ReadonlyArray<{ value: Period; label: string }>
-
 /**
  * AD-T1-1 · 통계 (탭 · 로그인 후 첫 화면)
  *
@@ -96,8 +90,6 @@ const PERIODS = [
 export function StatsPage() {
   const [view, setView] = useState<View>('live')
   const [metric, setMetric] = useState<Metric>('pages')
-  /** 누적 원가는 기간과 무관하게 같은 구성으로 내려옵니다(명세) — 탭은 강조할 막대를 고릅니다. */
-  const [costPeriod, setCostPeriod] = useState<Period>('today')
 
   // 고른 지표를 이 구간에서 못 보여주면 되는 쪽으로 넘어갑니다.
   const shown: Metric = CAN_SHOW[view][metric] ? metric : metric === 'jobs' ? 'pages' : 'jobs'
@@ -220,66 +212,6 @@ export function StatsPage() {
         </div>
       </Card>
 
-      <Card
-        title="누적 원가"
-        note="AI 서버 비용만 · 인건비·고정비 제외"
-        actions={<Segmented value={costPeriod} options={PERIODS} onChange={setCostPeriod} />}
-      >
-        <Query state={overview} rows={4}>
-          {(data) => {
-            const cost = data.cost
-            // 지난주 누적은 일 평균 × 7 로 되돌려 비교합니다. (FE 계산)
-            const weekDelta = changeRate(cost.thisWeekTotalKrw, cost.lastWeekDailyAvgKrw * 7)
-            const bars = [
-              { key: 'today', label: '오늘', amount: cost.todayKrw },
-              { key: 'yesterday', label: '어제', amount: cost.yesterdayKrw },
-              { key: 'week', label: '이번 주 평균', amount: cost.thisWeekDailyAvgKrw },
-              { key: 'lastWeek', label: '지난주 평균', amount: cost.lastWeekDailyAvgKrw },
-            ]
-            const emphasized = costPeriod === 'today' ? 'today' : costPeriod === 'week' ? 'week' : null
-
-            return (
-              <div className="grid-2">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <HBarChart
-                    data={bars.map((bar) => ({
-                      label: bar.label,
-                      value: bar.amount,
-                      display: wonSuffix(bar.amount),
-                      tone: bar.key === emphasized ? 'brand' : 'muted',
-                      strong: bar.key === emphasized,
-                    }))}
-                  />
-                  <p className="card__note">같은 축에 두어 크기를 바로 비교합니다</p>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div className="stat">
-                    <span className="stat__label">이번 주 누적</span>
-                    <span className="stat__value num">{won(cost.thisWeekTotalKrw)}</span>
-                    <span className="stat__sub">
-                      지난주 대비 {weekDelta === null ? '—' : signedPercent(weekDelta)}
-                    </span>
-                  </div>
-                  <div className="stat">
-                    <span className="stat__label">이번 달 누적</span>
-                    <span className="stat__value num">{won(cost.thisMonthTotalKrw)}</span>
-                    <span className="stat__sub">
-                      처리 {number(cost.thisMonthPages)}쪽 · 쪽당 {won(cost.krwPerPage)}
-                    </span>
-                  </div>
-                  {/* 명세 §overview: uncertain=단가표에 없는 모델이 섞였다는 뜻입니다. */}
-                  {cost.uncertain && (
-                    <p className="card__note">
-                      단가표에 없는 모델이 포함돼 실제 원가보다 작게 잡혔을 수 있습니다.
-                    </p>
-                  )}
-                </div>
-              </div>
-            )
-          }}
-        </Query>
-      </Card>
     </>
   )
 }

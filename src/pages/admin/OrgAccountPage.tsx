@@ -77,7 +77,12 @@ export function OrgAccountPage() {
                 <tbody>
                   {data.items.map((org) => (
                       <Fragment key={org.orgId}>
-                        {org.accounts.map((account, index) => (
+                        {[...org.accounts]
+                          // 기관 관리자 계정을 맨 위에 둡니다 — 한눈에 구분되도록.
+                          .sort((a, b) =>
+                            Number(b.role === 'ROLE_ORG_ADMIN') - Number(a.role === 'ROLE_ORG_ADMIN'),
+                          )
+                          .map((account, index) => (
                           <tr key={account.loginId}>
                             {index === 0 && (
                               <td rowSpan={org.accounts.length + 1} className="table__org">
@@ -105,6 +110,12 @@ export function OrgAccountPage() {
                               >
                                 {account.loginId}
                               </button>
+                              {account.role === 'ROLE_ORG_ADMIN' && (
+                                <>
+                                  {' '}
+                                  <Badge tone="brand">관리자</Badge>
+                                </>
+                              )}
                               {account.alias && <small className="muted"> · {account.alias}</small>}
                             </td>
                             <td>
