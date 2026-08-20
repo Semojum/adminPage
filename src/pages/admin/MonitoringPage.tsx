@@ -11,6 +11,7 @@ import {
   elapsedSec,
   jobStatusText,
   jobStatusTone,
+  modeLabel,
   number,
   won,
 } from '@/lib/format'
@@ -46,11 +47,12 @@ export function MonitoringPage() {
   /** CSV 는 화면이 만듭니다 — 지금 걸린 필터 그대로. (명세: BE 엔드포인트 없음) */
   const exportCsv = (items: JobSummary[]) => {
     const blob = toCsvBlob(
-      ['작업명', '기관', '계정', '쪽수', '소요(초)', '원가(원)', '상태', '요청 시각', '완료 시각'],
+      ['작업명', '기관', '계정', '모드', '쪽수', '소요(초)', '원가(원)', '상태', '요청 시각', '완료 시각'],
       items.map((job) => [
         job.fileName,
         job.orgName ?? '',
         job.loginId ?? '',
+        job.mode ? modeLabel[job.mode] : '',
         job.totalPages,
         elapsedSec(job.startedAt, job.finishedAt) ?? '',
         job.costKrw === null ? '' : Math.round(job.costKrw),
@@ -101,6 +103,7 @@ export function MonitoringPage() {
                 <tr>
                   <th>작업명</th>
                   <th>기관</th>
+                  <th>모드</th>
                   <th className="table__num">쪽수</th>
                   <th className="table__num">소요</th>
                   <th className="table__num">원가</th>
@@ -115,6 +118,10 @@ export function MonitoringPage() {
                     <tr key={job.jobId}>
                       <td>{job.fileName}</td>
                       <td className={job.orgName ? '' : 'dash'}>{job.orgName ?? '—'}</td>
+                      {/* 변환 모드 — a OCR / b 점역 / c 통합 (명세 §T1-3 mode) */}
+                      <td className={job.mode ? '' : 'dash'}>
+                        {job.mode ? modeLabel[job.mode] : '—'}
+                      </td>
                       <td className="table__num">{number(job.totalPages)}</td>
                       {/* 진행 중이면 소요·원가는 —. 끝나야 확정됩니다. (명세 §T1-3) */}
                       <td className="table__num">
