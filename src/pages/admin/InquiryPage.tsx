@@ -23,7 +23,13 @@ const TYPES = [
   { value: 'ETC', label: '기타' },
 ] as const satisfies ReadonlyArray<{ value: InquiryType | 'all'; label: string }>
 
-/** 보낸 사람 — 미가입(홈페이지·메일) 문의는 기관·계정이 없습니다. */
+/**
+ * 보낸 사람 — 미가입(홈페이지·메일) 문의는 기관·계정이 없습니다.
+ *
+ * 명세 §문의: 미가입 문의는 **senderEmail 이 보낸 사람 자리**에 옵니다.
+ * 홈페이지 문의는 subject 에 보낸 사람 이름이 들어오고,
+ * 메일 문의의 subject 는 메일 제목이라 여기서는 쓰지 않습니다(모달 제목으로 씁니다).
+ */
 function sender(inquiry: Inquiry) {
   if (inquiry.orgName) {
     return (
@@ -33,9 +39,14 @@ function sender(inquiry: Inquiry) {
       </>
     )
   }
+
+  const name = inquiry.type === 'EMAIL' ? null : inquiry.subject
+  const email = inquiry.senderEmail
+
   return (
     <>
-      {inquiry.subject ?? inquiry.senderEmail ?? '미가입'}
+      {name ?? email ?? '미가입'}
+      {name && email && <span className="muted"> · {email}</span>}
       <span className="muted"> 미가입</span>
     </>
   )

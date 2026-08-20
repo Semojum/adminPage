@@ -580,15 +580,26 @@ textarea {
   padding-top: 18px;
 }
 
+/*
+ * 눈금 라벨은 격자선과 같은 자리에 둡니다.
+ * 균등 분배(space-between)로 두면 값과 위치가 어긋나고,
+ * 맨 아래 라벨이 바닥에 붙어 원점이 0 이 아닌 것처럼 보입니다.
+ * 높이·아래 여백을 .vbars__plot 과 똑같이 맞춰 퍼센트가 같은 뜻이 되게 합니다.
+ */
 .vbars__axis {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: flex-end;
+  position: relative;
+  height: 190px;
+  margin-bottom: 22px;
+}
+
+.vbars__tick {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
   font-size: 11px;
   color: var(--sub);
   font-variant-numeric: tabular-nums;
-  padding-bottom: 22px;
+  white-space: nowrap;
 }
 
 .vbars__plot {

@@ -170,6 +170,26 @@ export function bucketLabel(value: string, period: 'hour' | 'day' | 'month'): st
   return `${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`
 }
 
+/**
+ * 주간 막대 축 라벨 — "7월 1주 · 2주 · 3주 · 4주 · 8월 1주 · 2주".
+ *
+ * 달이 바뀌는 자리에만 달을 적습니다(Figma AD-T1-2 표기).
+ * 한 칸씩 볼 수 없어 구간 전체를 받아 한 번에 만듭니다.
+ */
+export function weekLabels(buckets: string[]): string[] {
+  let lastMonth: number | null = null
+  return buckets.map((bucket) => {
+    const parsed = parse(bucket)
+    if (!parsed) return bucket
+    const month = parsed.getMonth() + 1
+    // 1~7일 = 1주, 8~14일 = 2주 …
+    const week = Math.floor((parsed.getDate() - 1) / 7) + 1
+    const label = month === lastMonth ? `${week}주` : `${month}월 ${week}주`
+    lastMonth = month
+    return label
+  })
+}
+
 /** "2026-08" → "2026년 8월" */
 export function monthLabel(month: string): string {
   const [year, mm] = month.split('-')

@@ -131,11 +131,16 @@ export function VBarChart({
     Math.round((max / axisTicks) * (axisTicks - i)),
   ).filter((tick, index, all) => tick > 0 && all.indexOf(tick) === index)
 
+  // 원점(0)도 적어 둡니다 — 막대가 어디서 시작하는지 보이게.
+  const axisLabels = [...ticks, 0]
+
   return (
     <div className="vbars">
       <div className="vbars__axis" aria-hidden>
-        {ticks.map((tick) => (
-          <span key={tick}>{tick.toLocaleString('ko-KR')}</span>
+        {axisLabels.map((tick) => (
+          <span key={tick} className="vbars__tick" style={{ top: `${(1 - tick / max) * 100}%` }}>
+            {tick.toLocaleString('ko-KR')}
+          </span>
         ))}
       </div>
       <div className="vbars__plot">

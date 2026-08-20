@@ -11,6 +11,16 @@ const PERIODS = [
   { value: 'month', label: '월별' },
 ] as const satisfies ReadonlyArray<{ value: Period; label: string }>
 
+/**
+ * 상세 통계(T1-2)로 넘길 때 보던 기간을 그대로 이어 줍니다.
+ * T1-1 은 오늘/주간/월별, T1-2 작업량은 일별/주간/월별/전체라 "오늘"은 "일별"로 받습니다.
+ */
+const DETAIL_UNIT: Record<Period, string> = {
+  today: 'daily',
+  week: 'weekly',
+  month: 'monthly',
+}
+
 /** 직전 기간을 뭐라고 부를지 — 명세 prevPagesProcessed 는 "직전 기간 전체" 입니다. */
 const PREVIOUS_LABEL: Record<Period, string> = {
   today: '어제',
@@ -38,7 +48,7 @@ export function StatsPage() {
         actions={
           <>
             <Segmented value={period} options={PERIODS} onChange={setPeriod} />
-            <Link to="/admin/stats/detail" className="btn">
+            <Link to={`/admin/stats/detail?unit=${DETAIL_UNIT[period]}`} className="btn">
               상세 보기 ›
             </Link>
           </>
