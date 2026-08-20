@@ -3,7 +3,9 @@ import { useParams } from 'react-router-dom'
 import type { PageTextItem } from '@/api/types'
 import { useJobPage, useSendJobToMyPage } from '@/api/queries'
 import { Loading, Pagination, queryFallback } from '@/components/ui'
+import { Modal } from '@/components/Modal'
 import { useToast } from '@/components/Toast'
+import { useAuth } from '@/auth/AuthContext'
 import { WindowShell } from '@/layouts/WindowShell'
 import { resultFormat } from '@/lib/format'
 
@@ -48,6 +50,11 @@ export function JobPreviewWindow() {
   const page = useJobPage(jobId, pageNo)
   const send = useSendJobToMyPage()
   const toast = useToast()
+  const { session } = useAuth()
+
+  /** 사본을 받을 계정. 비우면 지금 로그인한 계정으로 갑니다(명세 §send-to-mypage). */
+  const [sendOpen, setSendOpen] = useState(false)
+  const [targetLoginId, setTargetLoginId] = useState('')
 
   // 에러·중단(오프라인)을 로딩보다 먼저 봅니다 — 이유 없이 스켈레톤만 도는 걸 막습니다.
   const fallback = queryFallback(page, 6)
@@ -68,17 +75,7 @@ export function JobPreviewWindow() {
     <WindowShell
       title={`변환 결과 — ${data.originalFileName}`}
       actions={
-        <button
-          type="button"
-          className="btn btn--primary"
-          disabled={send.isPending}
-          onClick={() =>
-            send.mutate(
-              { jobId },
-              { onSuccess: () => toast('운영자 계정 마이페이지로 사본을 보냈습니다.') },
-            )
-          }
-        >
+        <button type="button" className="btn btn--primary" onClick={() => setSendOpen(true)}>
           마이페이지로 보내기
         </button>
       }
@@ -152,6 +149,57 @@ export function JobPreviewWindow() {
         totalPages={data.totalPages}
         onPageChange={(next) => setPageNo(Math.min(Math.max(1, next), data.totalPages))}
       />
+
+      <Modal
+        open={sendOpen}
+        title="마이페이지로 보내기"
+        width={460}
+        onClose={() => setSendOpen(false)}
+        footer={
+          <>
+            <button type="button" className="btn" onClick={() => setSendOpen(false)}>
+              취소
+            </button>
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={send.isPending}
+              onClick={() =>
+                send.mutate(
+                  { jobId, targetLoginId: targetLoginId.trim() || undefined },
+                  {
+                    onSuccess: () => {
+                      toast(
+                        `${targetLoginId.trim() || session?.loginId} 마이페이지로 사본을 보냈습니다.`,
+                      )
+                      setSendOpen(false)
+                    },
+                  },
+                )
+              }
+            >
+              보내기
+            </button>
+          </>
+        }
+      >
+        <div className="form">
+          <div className="field">
+            <span className="field__label">받는 계정</span>
+            <input
+              className="input"
+              placeholder={session?.loginId ?? '비우면 내 계정'}
+              value={targetLoginId}
+              onChange={(event) => setTargetLoginId(event.target.value)}
+            />
+          </div>
+          <p className="card__note">
+            비우면 지금 로그인한 계정({session?.loginId ?? '—'})으로 갑니다. 받는 계정은{' '}
+            <strong>운영자(ROLE_ADMIN) 계정만</strong> 됩니다 — 고객 계정으로 잘못 보내는 것을 서버가
+            막습니다. 사본에는 파일명 뒤에 &quot;(관리자 사본)&quot;이 붙고 크레딧은 차감되지 않습니다.
+          </p>
+        </div>
+      </Modal>
 
       <p className="notice-box">
         원본과 결과는 <strong>같은 쪽</strong>을 봅니다 — 아래에서 쪽을 옮기면 둘 다 함께 움직입니다.

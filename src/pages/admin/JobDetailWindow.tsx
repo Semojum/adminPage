@@ -13,6 +13,7 @@ import {
   number,
   won,
 } from '@/lib/format'
+import { clientEnvironment } from '@/lib/userAgent'
 import { openWindow } from '@/lib/openWindow'
 
 /**
@@ -61,11 +62,15 @@ export function JobDetailWindow() {
             </Def>
             <Def label="기관">{request.orgName}</Def>
             <Def label="요청 시각">{dateTime(request.requestedAt)}</Def>
-            {/* 명세 §T1-4: 위치는 서버가 주지 않습니다. IP 를 그대로 적습니다. */}
+            {/* 명세 §T1-4: 위치(GeoIP)는 서버가 주지 않습니다 — IP 를 그대로 적습니다. */}
             <Def label="IP">{request.clientIp ?? '—'}</Def>
-            <Def label="접속 환경">
-              {[request.clientOs, request.clientBrowser].filter(Boolean).join(' · ') || '—'}
-            </Def>
+            {/* 서버의 간이 파싱값이 비면 원본 UA 에서 직접 뽑습니다. */}
+            <Def label="접속 환경">{clientEnvironment(request) ?? '—'}</Def>
+            {request.clientUserAgent && (
+              <Def label="User-Agent">
+                <span style={{ fontSize: 12, wordBreak: 'break-all' }}>{request.clientUserAgent}</span>
+              </Def>
+            )}
           </Defs>
         </Card>
 

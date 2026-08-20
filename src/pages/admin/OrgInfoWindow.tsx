@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import type { ContractType, IssueCouponInput, UpdateOrgInput } from '@/api/types'
+import type { ContractType, IssueCouponInput, IssuedCredential, UpdateOrgInput } from '@/api/types'
 import {
+  useAdminAccountAction,
   useAdminOrders,
   useCoupons,
+  useDeleteOrg,
   useIssueCoupon,
   useOrg,
   useUpdateOrder,
@@ -11,7 +13,7 @@ import {
 } from '@/api/queries'
 import { api } from '@/api'
 import { Badge, Card, ErrorBox, Loading, Meter, queryFallback } from '@/components/ui'
-import { Modal } from '@/components/Modal'
+import { ConfirmModal, Modal } from '@/components/Modal'
 import { useToast } from '@/components/Toast'
 import { WindowShell } from '@/layouts/WindowShell'
 import { CONTRACT_TYPES, contractTypeLabel, date, number, shortDate, usageRate, won } from '@/lib/format'
@@ -42,6 +44,9 @@ export function OrgInfoWindow() {
   const updateOrg = useUpdateOrg(orgId)
   const updateOrder = useUpdateOrder(orgId)
   const issueCoupon = useIssueCoupon(orgId)
+  // 기관 제어는 목록(T1-6) 소계에서 이 창으로 옮겨 왔습니다.
+  const accountAction = useAdminAccountAction()
+  const deleteOrg = useDeleteOrg()
   const toast = useToast()
 
   const [form, setForm] = useState<UpdateOrgInput | null>(null)
@@ -49,6 +54,8 @@ export function OrgInfoWindow() {
   const [paidAt, setPaidAt] = useState('')
   const [couponOpen, setCouponOpen] = useState(false)
   const [coupon, setCoupon] = useState<IssueCouponInput>(EMPTY_COUPON)
+  const [issued, setIssued] = useState<IssuedCredential | null>(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   // 불러온 값을 그대로 폼의 시작점으로 씁니다.
   useEffect(() => {
@@ -80,6 +87,7 @@ export function OrgInfoWindow() {
 
   const data = org.data
   const rate = usageRate(data.creditUsed, data.creditAllocated)
+  const orgAdmin = data.accounts.find((account) => account.role === 'ROLE_ORG_ADMIN')
 
   const save = () => {
     updateOrg.mutate(
@@ -108,9 +116,29 @@ export function OrgInfoWindow() {
     <WindowShell
       title={`기관 정보 — ${data.name}`}
       actions={
-        <button type="button" className="btn btn--primary" disabled={updateOrg.isPending} onClick={save}>
-          저장
-        </button>
+        <>
+          <button
+            type="button"
+            className="btn"
+            disabled={!orgAdmin}
+            title={orgAdmin ? undefined : '기관 관리자 계정이 없습니다.'}
+            onClick={() =>
+              orgAdmin &&
+              accountAction.mutate(
+                { type: 'reissuePassword', loginId: orgAdmin.loginId },
+                { onSuccess: (result) => result && setIssued(result) },
+              )
+            }
+          >
+            관리자 PW 재발급
+          </button>
+          <button type="button" className="btn btn--danger" onClick={() => setDeleteOpen(true)}>
+            기관 삭제
+          </button>
+          <button type="button" className="btn btn--primary" disabled={updateOrg.isPending} onClick={save}>
+            저장
+          </button>
+        </>
       }
     >
       <Card className="card--flat">
@@ -318,6 +346,50 @@ export function OrgInfoWindow() {
           체험·무료 제공은 쿠폰으로 줍니다. 차감은 쿠폰부터, 소진되면 계약 크레딧에서 빠집니다.
         </p>
       </Card>
+
+      <Modal
+        open={issued !== null}
+        title="관리자 PW 재발급"
+        width={420}
+        onClose={() => setIssued(null)}
+        footer={
+          <button type="button" className="btn btn--primary" onClick={() => setIssued(null)}>
+            확인했습니다
+          </button>
+        }
+      >
+        <div className="form">
+          <div className="field">
+            <span className="field__label">계정 ID</span>
+            <input className="input input--readonly" value={issued?.loginId ?? ''} readOnly />
+          </div>
+          <div className="field">
+            <span className="field__label">새 비밀번호</span>
+            <input className="input input--readonly num" value={issued?.password ?? ''} readOnly />
+          </div>
+          <p className="notice-box">
+            비밀번호는 <strong>이 창에서만</strong> 볼 수 있습니다. 서버는 해시만 보관해 다시 조회할 수
+            없습니다.
+          </p>
+        </div>
+      </Modal>
+
+      <ConfirmModal
+        open={deleteOpen}
+        title="기관 삭제"
+        message={`${data.name} 기관을 삭제합니다. 소속 계정이 모두 잠기고 진행 중이던 변환도 멈춥니다.`}
+        confirmLabel="삭제"
+        danger
+        onConfirm={() =>
+          deleteOrg.mutate(orgId, {
+            onSuccess: () => {
+              toast('기관을 삭제했습니다.')
+              window.close()
+            },
+          })
+        }
+        onClose={() => setDeleteOpen(false)}
+      />
 
       <Modal
         open={paymentTarget !== null}

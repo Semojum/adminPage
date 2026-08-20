@@ -334,14 +334,14 @@ textarea {
 }
 
 /* 잠금처럼 되돌릴 수 있는 조작 — 삭제(빨강)와 눈에 띄게 나눕니다. */
-.btn--warn {
-  color: #b45309;
-  border-color: #fde68a;
-  background: var(--warn-bg);
+.btn--muted {
+  color: var(--sub);
+  border-color: var(--line);
+  background: var(--line-2);
 }
 
-.btn--warn:hover {
-  background: #fef3c7;
+.btn--muted:hover {
+  background: #e6ebf2;
 }
 
 .btn--sm {

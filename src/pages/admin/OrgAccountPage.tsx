@@ -1,12 +1,6 @@
 import { Fragment, useState } from 'react'
 import type { AdminOrgRow, ContractType, IssuedCredential } from '@/api/types'
-import {
-  useAdminAccountAction,
-  useCreateAccounts,
-  useCreateOrg,
-  useDeleteOrg,
-  useOrgs,
-} from '@/api/queries'
+import { useAdminAccountAction, useCreateAccounts, useCreateOrg, useOrgs } from '@/api/queries'
 import { Badge, Card, Query } from '@/components/ui'
 import { ConfirmModal, Modal } from '@/components/Modal'
 import { useToast } from '@/components/Toast'
@@ -29,7 +23,6 @@ export function OrgAccountPage() {
   const toast = useToast()
 
   const accountAction = useAdminAccountAction()
-  const deleteOrg = useDeleteOrg()
 
   const [orgFormOpen, setOrgFormOpen] = useState(false)
   const [accountFormOpen, setAccountFormOpen] = useState(false)
@@ -77,14 +70,12 @@ export function OrgAccountPage() {
                     <th>계정 ID</th>
                     <th>상태</th>
                     <th>마지막 로그인</th>
-                    <th className="table__num">이번 달</th>
+                    <th className="table__num">이번 달 사용 크레딧</th>
                     <th>제어</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.items.map((org) => {
-                    const orgAdmin = org.accounts.find((account) => account.role === 'ROLE_ORG_ADMIN')
-                    return (
+                  {data.items.map((org) => (
                       <Fragment key={org.orgId}>
                         {org.accounts.map((account, index) => (
                           <tr key={account.loginId}>
@@ -124,19 +115,26 @@ export function OrgAccountPage() {
                             <td className={account.lastLoginAt ? '' : 'dash'}>
                               {lastLogin(account.lastLoginAt)}
                             </td>
-                            <td className="table__num">{number(account.monthCredits)}</td>
+                            {/* 기관 관리자 계정은 변환을 돌리지 않습니다 — 사용 크레딧을 — 로 둡니다. */}
+                            <td className="table__num">
+                              {account.role === 'ROLE_ORG_ADMIN' ? (
+                                <span className="dash">—</span>
+                              ) : (
+                                number(account.monthCredits)
+                              )}
+                            </td>
                             <td className="table__actions">
                               <button
                                 type="button"
                                 className="btn btn--sm"
                                 onClick={() => reissue(account.loginId, account.loginId)}
                               >
-                                비번 재발급
+                                PW 재발급
                               </button>
                               <button
                                 type="button"
-                                /* 잠금은 주의(주황), 잠금 해제는 되돌리는 조작이라 색을 빼둡니다. */
-                                className={`btn btn--sm ${account.status === 'INACTIVE' ? '' : 'btn--warn'}`}
+                                /* 잠금은 되돌릴 수 있는 조작이라 회색, 삭제만 빨강으로 둡니다. */
+                                className={`btn btn--sm ${account.status === 'INACTIVE' ? '' : 'btn--muted'}`}
                                 onClick={() =>
                                   ask({
                                     // 명세 §계정 상태 변경: INACTIVE 는 활성 세션을 즉시 끊습니다.
@@ -207,38 +205,11 @@ export function OrgAccountPage() {
                             <span className="muted">(관리자)</span>
                           </td>
                           <td className="table__num">{number(org.subtotal.monthCredits)}</td>
-                          <td className="table__actions">
-                            <button
-                              type="button"
-                              className="btn btn--sm"
-                              disabled={!orgAdmin}
-                              onClick={() => orgAdmin && reissue(orgAdmin.loginId, `${org.name} 관리자`)}
-                            >
-                              관리자 비번 재발급
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn--sm btn--danger"
-                              onClick={() =>
-                                ask({
-                                  title: '기관 삭제',
-                                  message: `${org.name} 기관을 삭제합니다. 소속 계정이 모두 잠기고 진행 중이던 변환도 멈춥니다.`,
-                                  confirmLabel: '삭제',
-                                  danger: true,
-                                  run: () =>
-                                    deleteOrg.mutate(org.orgId, {
-                                      onSuccess: () => toast('기관을 삭제했습니다.'),
-                                    }),
-                                })
-                              }
-                            >
-                              기관 삭제
-                            </button>
-                          </td>
+                          {/* 소계는 합계만 봅니다 — 기관 제어(PW 재발급·삭제)는 기관 정보 창에서 합니다. */}
+                          <td />
                         </tr>
                       </Fragment>
-                    )
-                  })}
+                  ))}
                 </tbody>
               </table>
             </div>
