@@ -666,6 +666,15 @@ textarea {
   background: var(--brand-2);
 }
 
+/* 성패를 나누는 막대 — 완료 초록 / 실패·취소 빨강 */
+.vbar__seg--ok {
+  background: var(--ok);
+}
+
+.vbar__seg--danger {
+  background: var(--danger);
+}
+
 .vbar__label {
   position: absolute;
   bottom: -20px;
@@ -759,6 +768,14 @@ textarea {
 
 .legend__swatch--secondary {
   background: var(--brand-2);
+}
+
+.legend__swatch--ok {
+  background: var(--ok);
+}
+
+.legend__swatch--danger {
+  background: var(--danger);
 }
 
 .legend__spacer {

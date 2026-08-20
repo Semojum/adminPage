@@ -111,15 +111,30 @@ export interface VBarDatum {
   caption?: string
 }
 
+/**
+ * 막대 색.
+ * - brand  : 그냥 양을 보여주는 막대 (처리 쪽수 · 사용 크레딧)
+ * - status : 성패를 나누는 막대 — 완료 초록 / 실패·취소 빨강
+ */
+export type VBarTone = 'brand' | 'status'
+
+const SEG_CLASS: Record<VBarTone, { primary: string; secondary: string }> = {
+  brand: { primary: 'vbar__seg--primary', secondary: 'vbar__seg--secondary' },
+  status: { primary: 'vbar__seg--ok', secondary: 'vbar__seg--danger' },
+}
+
 export function VBarChart({
   data,
   axisTicks = 3,
+  tone = 'brand',
   formatCaption = (total: number) => total.toLocaleString('ko-KR'),
 }: {
   data: VBarDatum[]
   axisTicks?: number
+  tone?: VBarTone
   formatCaption?: (total: number) => string
 }) {
+  const seg = SEG_CLASS[tone]
   const totals = data.map((d) => d.primary + (d.secondary ?? 0))
   const max = Math.max(1, ...totals)
   /**
@@ -160,12 +175,12 @@ export function VBarChart({
               <div className="vbar__stack" style={{ height: `${heightPercent}%` }}>
                 {datum.secondary ? (
                   <div
-                    className="vbar__seg vbar__seg--secondary"
+                    className={`vbar__seg ${seg.secondary}`}
                     style={{ height: `${(datum.secondary / total) * 100}%` }}
                   />
                 ) : null}
                 <div
-                  className="vbar__seg vbar__seg--primary"
+                  className={`vbar__seg ${seg.primary}`}
                   style={{ height: `${(datum.primary / total) * 100}%` }}
                 />
               </div>

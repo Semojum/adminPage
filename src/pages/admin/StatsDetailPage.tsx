@@ -115,6 +115,7 @@ export function StatsDetailPage() {
             return (
             <>
               <VBarChart
+                tone="status"
                 data={data.buckets.map((point, index) => ({
                   label: labels[index],
                   primary: point.completed,
@@ -125,11 +126,11 @@ export function StatsDetailPage() {
               />
               <div className="legend">
                 <span className="legend__item">
-                  <i className="legend__swatch" />
+                  <i className="legend__swatch legend__swatch--ok" />
                   완료
                 </span>
                 <span className="legend__item">
-                  <i className="legend__swatch legend__swatch--secondary" />
+                  <i className="legend__swatch legend__swatch--danger" />
                   실패·취소
                 </span>
                 <span className="legend__spacer">막대 위 숫자는 합계입니다</span>
