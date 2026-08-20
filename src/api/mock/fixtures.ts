@@ -349,10 +349,11 @@ export const jobDetails: Record<string, T.JobDetail> = {
       orgName: '한국점자도서관',
       requestedAt: at(0, 10, 22, 14),
       clientIp: '211.198.114.11',
-      clientOs: 'Windows 11',
-      clientBrowser: 'Chrome 141',
-      clientUserAgent:
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
+      clientLocation: 'Seoul, South Korea',
+      // 현행 앱은 Tauri 라 UA 에 OS 가 없습니다 — 앱이 X-Client-Os 를 보내야 clientOs 가 찹니다.
+      clientOs: null,
+      clientBrowser: '세모점 앱 (Tauri 2.5.8)',
+      clientUserAgent: 'tauri-plugin-http/2.5.8',
     },
     processing: {
       totalPages: 14,

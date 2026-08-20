@@ -226,8 +226,13 @@ export interface JobDetail {
     alias: string | null
     orgName: string
     requestedAt: string
-    /** 위치는 서버가 주지 않습니다 — 화면은 IP 만 그대로 보여줍니다. */
     clientIp: string | null
+    /**
+     * IP 로 찾은 접속 위치 — "Seoul, South Korea" (2026-08-20 추가).
+     * 서버가 조회 시점에 GeoIP(ip-api, 24시간 캐시)로 붙입니다.
+     * 조회 실패나 사설 IP 면 null 이고, 그때는 화면이 IP 만 보여줍니다.
+     */
+    clientLocation: string | null
     clientOs: string | null
     clientBrowser: string | null
     clientUserAgent: string | null

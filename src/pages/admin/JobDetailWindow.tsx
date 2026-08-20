@@ -62,8 +62,10 @@ export function JobDetailWindow() {
             </Def>
             <Def label="기관">{request.orgName}</Def>
             <Def label="요청 시각">{dateTime(request.requestedAt)}</Def>
-            {/* 명세 §T1-4: 위치(GeoIP)는 서버가 주지 않습니다 — IP 를 그대로 적습니다. */}
-            <Def label="IP">{request.clientIp ?? '—'}</Def>
+            {/* 위치는 서버가 GeoIP 로 붙여 줍니다. 사설 IP·조회 실패면 null 이라 IP 만 적습니다. */}
+            <Def label="IP · 위치">
+              {[request.clientIp, request.clientLocation].filter(Boolean).join(' · ') || '—'}
+            </Def>
             {/* 서버의 간이 파싱값이 비면 원본 UA 에서 직접 뽑습니다. */}
             <Def label="접속 환경">{clientEnvironment(request) ?? '—'}</Def>
             {request.clientUserAgent && (
