@@ -8,6 +8,7 @@ import {
   useDeleteOrg,
   useIssueCoupon,
   useOrg,
+  useOrgs,
   useUpdateOrder,
   useUpdateOrg,
 } from '@/api/queries'
@@ -38,6 +39,8 @@ const EMPTY_COUPON: IssueCouponInput = { name: '', creditAmount: 1_000, startsOn
 export function OrgInfoWindow() {
   const { orgId = '' } = useParams()
   const org = useOrg(orgId)
+  // 상세 응답은 계정 ID 만 줍니다 — 역할(관리자 여부)은 목록에서 가져옵니다.
+  const orgs = useOrgs()
   const orders = useAdminOrders(orgId)
   const coupons = useCoupons(orgId)
 
@@ -87,7 +90,9 @@ export function OrgInfoWindow() {
 
   const data = org.data
   const rate = usageRate(data.creditUsed, data.creditAllocated)
-  const orgAdmin = data.accounts.find((account) => account.role === 'ROLE_ORG_ADMIN')
+  const orgAdmin = orgs.data?.items
+    .find((item) => item.orgId === orgId)
+    ?.accounts.find((account) => account.role === 'ROLE_ORG_ADMIN')
 
   const save = () => {
     updateOrg.mutate(
@@ -192,7 +197,7 @@ export function OrgInfoWindow() {
             <span className="field__label">소속 계정</span>
             <input
               className="input input--readonly"
-              value={data.accounts.map((account) => account.loginId).join(' · ') || '없음'}
+              value={data.accountLoginIds.join(' · ') || '없음'}
               readOnly
             />
           </div>

@@ -161,7 +161,7 @@ export const httpApi: Api = {
         creditRemaining:
           result?.creditRemaining ?? (result?.creditAllocated ?? 0) - (result?.creditUsed ?? 0),
         receiptEmail: result?.receiptEmail ?? null,
-        accounts: Array.isArray(result?.accounts) ? result.accounts : [],
+        accountLoginIds: Array.isArray(result?.accountLoginIds) ? result.accountLoginIds : [],
       })),
 
     updateOrg: (orgId, patch) =>

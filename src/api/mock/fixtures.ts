@@ -484,10 +484,7 @@ export const orgDetails: Record<string, T.OrgDetail> = {
     creditUsed: 1_960,
     creditRemaining: 8_040,
     receiptEmail: 'account@kblib.or.kr',
-    accounts: [
-      { loginId: 'kblib01', alias: '관리자', role: 'ROLE_ORG_ADMIN', status: 'ACTIVE' },
-      { loginId: 'kblib02', alias: '수학 담당', role: 'ROLE_USER', status: 'ACTIVE' },
-    ],
+    accountLoginIds: ['kblib01', 'kblib02'],
   },
   'org-snsb': {
     orgId: 'org-snsb',
@@ -500,7 +497,7 @@ export const orgDetails: Record<string, T.OrgDetail> = {
     creditUsed: 1_870,
     creditRemaining: 4_130,
     receiptEmail: null,
-    accounts: [{ loginId: 'snsb01', alias: '관리자', role: 'ROLE_ORG_ADMIN', status: 'ACTIVE' }],
+    accountLoginIds: ['snsb01'],
   },
   'org-pub': {
     orgId: 'org-pub',
@@ -513,7 +510,7 @@ export const orgDetails: Record<string, T.OrgDetail> = {
     creditUsed: 0,
     creditRemaining: 0,
     receiptEmail: null,
-    accounts: [{ loginId: 'oopub01', alias: null, role: 'ROLE_ORG_ADMIN', status: 'INACTIVE' }],
+    accountLoginIds: ['oopub01'],
   },
 }
 

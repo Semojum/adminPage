@@ -344,7 +344,11 @@ export interface OrgDetail {
   creditUsed: number
   creditRemaining: number
   receiptEmail: string | null
-  accounts: Array<{ loginId: string; alias: string | null; role: Role; status: AccountStatus }>
+  /**
+   * 소속 계정 **ID 만** 옵니다 — 별칭·역할·상태는 목록(GET /api/admin/orgs)에 있습니다.
+   * (2026-08-20 실제 응답 확인: accountLoginIds)
+   */
+  accountLoginIds: string[]
 }
 
 export interface UpdateOrgInput {

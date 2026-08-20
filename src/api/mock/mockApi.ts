@@ -149,7 +149,7 @@ export const mockApi: Api = {
         creditUsed: 0,
         creditRemaining: 0,
         receiptEmail: null,
-        accounts: [],
+        accountLoginIds: [],
       }
       state.coupons[orgId] = []
       return delay({ organizationId: orgId, name: input.name, code })
@@ -196,12 +196,7 @@ export const mockApi: Api = {
           lastLoginAt: null,
           monthCredits: 0,
         })
-        detail?.accounts.push({
-          loginId,
-          alias: null,
-          role: org.accounts.length === 1 ? 'ROLE_ORG_ADMIN' : 'ROLE_USER',
-          status: 'ACTIVE',
-        })
+        detail?.accountLoginIds.push(loginId)
         issued.push({ loginId, password: randomPassword() })
       }
       org.subtotal.accountCount = org.accounts.length
@@ -215,7 +210,7 @@ export const mockApi: Api = {
         org.subtotal.accountCount = org.accounts.length
         org.subtotal.monthCredits = org.accounts.reduce((sum, item) => sum + item.monthCredits, 0)
         const detail = state.orgDetails[org.orgId]
-        if (detail) detail.accounts = detail.accounts.filter((item) => item.loginId !== loginId)
+        if (detail) detail.accountLoginIds = detail.accountLoginIds.filter((id) => id !== loginId)
       }
       await delay(null)
     },
