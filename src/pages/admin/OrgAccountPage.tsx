@@ -131,11 +131,12 @@ export function OrgAccountPage() {
                                 className="btn btn--sm"
                                 onClick={() => reissue(account.loginId, account.loginId)}
                               >
-                                비번
+                                비번 재발급
                               </button>
                               <button
                                 type="button"
-                                className="btn btn--sm btn--danger"
+                                /* 잠금은 주의(주황), 잠금 해제는 되돌리는 조작이라 색을 빼둡니다. */
+                                className={`btn btn--sm ${account.status === 'INACTIVE' ? '' : 'btn--warn'}`}
                                 onClick={() =>
                                   ask({
                                     // 명세 §계정 상태 변경: INACTIVE 는 활성 세션을 즉시 끊습니다.
@@ -162,7 +163,7 @@ export function OrgAccountPage() {
                               </button>
                               <button
                                 type="button"
-                                className="btn btn--sm"
+                                className="btn btn--sm btn--danger"
                                 onClick={() =>
                                   ask({
                                     title: '계정 삭제',
@@ -213,7 +214,7 @@ export function OrgAccountPage() {
                               disabled={!orgAdmin}
                               onClick={() => orgAdmin && reissue(orgAdmin.loginId, `${org.name} 관리자`)}
                             >
-                              관리자 비번
+                              관리자 비번 재발급
                             </button>
                             <button
                               type="button"
