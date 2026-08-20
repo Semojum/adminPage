@@ -30,6 +30,29 @@ export function Card({
   )
 }
 
+/* ─────────────── 아이콘 ─────────────── */
+
+/** 내려받기 아이콘. 아이콘 라이브러리를 쓰지 않아 필요한 것만 직접 그립니다. */
+export function DownloadIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden focusable="false">
+      <path
+        d="M8 2.5v6.5m0 0 2.5-2.5M8 9 5.5 6.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M2.75 10.75v1.5c0 .69.56 1.25 1.25 1.25h8c.69 0 1.25-.56 1.25-1.25v-1.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 /* ─────────────── Badge ─────────────── */
 
 export type Tone = 'ok' | 'warn' | 'danger' | 'info' | 'muted' | 'brand'

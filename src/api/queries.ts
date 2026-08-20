@@ -28,7 +28,7 @@ export const qk = {
   layoutCost: (month: string) => ['admin', 'stats', 'layoutCost', month] as const,
   profitability: (month: string) => ['admin', 'stats', 'profitability', month] as const,
 
-  jobs: (status: JobStatusFilter) => ['admin', 'jobs', status] as const,
+  jobs: (status: JobStatusFilter, hours: number) => ['admin', 'jobs', status, hours] as const,
   job: (jobId: string) => ['admin', 'job', jobId] as const,
   jobPage: (jobId: string, pageNo: number) => ['admin', 'job', jobId, 'page', pageNo] as const,
 
@@ -71,10 +71,17 @@ export const useProfitability = (month: string) =>
 /* ── T1-3 ── 명세 §T1-3: 10초마다 폴링합니다. */
 export const MONITORING_REFETCH_MS = 10_000
 
-export const useJobs = (status: JobStatusFilter) =>
+/**
+ * 명세 §T1-3 의 서버 파라미터는 status · hours · size 뿐입니다.
+ * 기관·작업명·원가·계정은 화면에서 거르고, 날짜는 hours 로 넘겨 조회 범위를 넓힙니다.
+ */
+export const MONITORING_MAX_HOURS = 168
+export const MONITORING_SIZE = 200
+
+export const useJobs = (status: JobStatusFilter, hours = 24) =>
   useQuery({
-    queryKey: qk.jobs(status),
-    queryFn: () => api.admin.getJobs({ status }),
+    queryKey: qk.jobs(status, hours),
+    queryFn: () => api.admin.getJobs({ status, hours, size: MONITORING_SIZE }),
     refetchInterval: MONITORING_REFETCH_MS,
     refetchOnWindowFocus: true,
   })

@@ -2,12 +2,9 @@ import { useParams } from 'react-router-dom'
 import type { JobPageResult, LayoutType } from '@/api/types'
 import { useJob } from '@/api/queries'
 import { Badge, Card, Def, Defs, ErrorBox, Loading } from '@/components/ui'
-import { useToast } from '@/components/Toast'
 import { WindowShell } from '@/layouts/WindowShell'
-import { toCsvBlob } from '@/lib/csv'
 import {
   dateTime,
-  downloadBlob,
   duration,
   elapsedSec,
   jobStatusText,
@@ -81,7 +78,6 @@ function pageRange(pages: number[]): string {
 export function JobDetailWindow() {
   const { jobId = '' } = useParams()
   const job = useJob(jobId)
-  const toast = useToast()
 
   if (job.isPending) {
     return (
@@ -106,21 +102,6 @@ export function JobDetailWindow() {
     ? processing.costKrw / processing.totalPages
     : null
 
-  const exportCsv = () => {
-    const blob = toCsvBlob(
-      ['쪽', '레이아웃', '원가(원)', '상태', '사유'],
-      groups.map((group) => [
-        pageRange(group.pages),
-        group.layoutType ? layoutLabel[group.layoutType] : '',
-        Math.round(group.costKrw),
-        group.failed ? '실패' : '완료',
-        group.reason ?? '',
-      ]),
-    )
-    downloadBlob(blob, `${data.fileName}_쪽별결과.csv`)
-    toast('CSV 를 내려받았습니다.')
-  }
-
   return (
     <WindowShell
       title={data.fileName}
@@ -132,11 +113,6 @@ export function JobDetailWindow() {
             failedPages: processing.failedPages,
           })}
         </Badge>
-      }
-      actions={
-        <button type="button" className="btn" onClick={exportCsv}>
-          CSV
-        </button>
       }
     >
       <div className="grid-2">
