@@ -116,7 +116,13 @@ export function OrgAccountPage() {
                                   <Badge tone="brand">관리자</Badge>
                                 </>
                               )}
-                              {account.alias && <small className="muted"> · {account.alias}</small>}
+                              {/*
+                                별칭이 배지와 같은 말이면(관리자 계정의 별칭이 "관리자") 두 번 적히므로 뺍니다.
+                                배지는 역할, 별칭은 담당 업무라 서로 다른 값일 때만 나란히 둡니다.
+                              */}
+                              {account.alias && account.alias.trim() !== '관리자' && (
+                                <small className="muted"> · {account.alias}</small>
+                              )}
                             </td>
                             <td>
                               <Badge tone={account.status === 'ACTIVE' ? 'ok' : 'muted'}>

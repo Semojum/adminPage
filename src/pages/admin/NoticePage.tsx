@@ -209,10 +209,11 @@ export function NoticePage() {
           </div>
           <div style={{ color: 'var(--ink)', fontWeight: 700, marginBottom: 6 }}>{form.title}</div>
           <div style={{ color: 'var(--ink)', whiteSpace: 'pre-wrap' }}>{form.body}</div>
-          <div style={{ marginTop: 10 }}>
-            노출 {form.startsOn || '—'} ~ {form.endsOn || '—'}
-          </div>
         </div>
+        {/* 노출 기간은 공지 내용이 아니라 운영 정보라 블록 밖에 둡니다. */}
+        <p className="card__note">
+          노출 {form.startsOn || '—'} ~ {form.endsOn || '—'}
+        </p>
       </Modal>
     </div>
   )
