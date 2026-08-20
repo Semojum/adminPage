@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom'
-import type { JobPageResult, LayoutType } from '@/api/types'
+import type { LayoutType } from '@/api/types'
 import { useJob } from '@/api/queries'
 import { Badge, Card, Def, Defs, ErrorBox, Loading } from '@/components/ui'
 import { WindowShell } from '@/layouts/WindowShell'
@@ -14,59 +14,6 @@ import {
   won,
 } from '@/lib/format'
 import { openWindow } from '@/lib/openWindow'
-
-/**
- * 쪽별 결과 묶음.
- *
- * 서버는 쪽 단위로 내려주고, 화면이 "같은 유형·같은 결과"끼리 묶어 "1~7", "11 · 13" 처럼 적습니다.
- * (Figma AD-T1-4 의 표기)
- */
-interface PageGroup {
-  key: string
-  pages: number[]
-  layoutType: LayoutType | null
-  costKrw: number
-  failed: boolean
-  reason: string | null
-}
-
-function groupPages(pages: JobPageResult[]): PageGroup[] {
-  const groups = new Map<string, PageGroup>()
-  for (const page of pages) {
-    const reason = page.reasons.length > 0 ? page.reasons.join(' · ') : null
-    const key = `${page.layoutType ?? '-'}|${reason ?? ''}`
-    const found = groups.get(key)
-    if (found) {
-      found.pages.push(page.pageNo)
-      found.costKrw += page.costKrw ?? 0
-    } else {
-      groups.set(key, {
-        key,
-        pages: [page.pageNo],
-        layoutType: page.layoutType,
-        costKrw: page.costKrw ?? 0,
-        failed: reason !== null,
-        reason,
-      })
-    }
-  }
-  // 표는 쪽 번호 순으로 보여줍니다.
-  return [...groups.values()].sort((a, b) => a.pages[0] - b.pages[0])
-}
-
-/** [1,2,3,5] → "1~3 · 5" */
-function pageRange(pages: number[]): string {
-  const sorted = [...pages].sort((a, b) => a - b)
-  const runs: number[][] = []
-  for (const page of sorted) {
-    const last = runs[runs.length - 1]
-    if (last && page === last[last.length - 1] + 1) last.push(page)
-    else runs.push([page])
-  }
-  return runs
-    .map((run) => (run.length > 1 ? `${run[0]}~${run[run.length - 1]}` : `${run[0]}`))
-    .join(' · ')
-}
 
 /**
  * AD-T1-4 · 작업 상세 (새 창, T1-3 의 [상세 보기])
@@ -96,7 +43,6 @@ export function JobDetailWindow() {
 
   const data = job.data
   const { processing, request } = data
-  const groups = groupPages(data.pages)
   const seconds = elapsedSec(processing.startedAt, processing.finishedAt)
   const perPage = processing.costKrw !== null && processing.totalPages > 0
     ? processing.costKrw / processing.totalPages
@@ -176,25 +122,39 @@ export function JobDetailWindow() {
           <table className="table">
             <thead>
               <tr>
-                <th>쪽</th>
+                <th className="table__num">쪽</th>
                 <th>레이아웃</th>
                 <th className="table__num">원가</th>
+                <th className="table__num">크레딧</th>
                 <th>상태</th>
                 <th>사유</th>
               </tr>
             </thead>
             <tbody>
-              {groups.map((group) => (
-                <tr key={group.key}>
-                  <td>{pageRange(group.pages)}</td>
-                  <td>{group.layoutType ? layoutLabel[group.layoutType] : '—'}</td>
-                  <td className="table__num">{won(group.costKrw)}</td>
-                  <td>
-                    <Badge tone={group.failed ? 'danger' : 'ok'}>{group.failed ? '실패' : '완료'}</Badge>
-                  </td>
-                  <td className={group.reason ? '' : 'dash'}>{group.reason ?? '—'}</td>
-                </tr>
-              ))}
+              {/* 서버가 주는 쪽 그대로 한 줄씩 봅니다. */}
+              {[...data.pages]
+                .sort((a, b) => a.pageNo - b.pageNo)
+                .map((page) => {
+                  const reason = page.reasons.length > 0 ? page.reasons.join(' · ') : null
+                  const failed = page.status !== 'COMPLETED' || reason !== null
+                  return (
+                    <tr key={page.pageNo}>
+                      <td className="num">{page.pageNo}</td>
+                      <td>{page.layoutType ? layoutLabel[page.layoutType] : '—'}</td>
+                      <td className="table__num">
+                        {page.costKrw === null ? <span className="dash">—</span> : won(page.costKrw)}
+                      </td>
+                      <td className="table__num">
+                        {/* 실패한 쪽은 차감하지 않습니다 — 명세 §T1-4 pages[].credit */}
+                        {page.credit === null ? <span className="dash">—</span> : number(page.credit)}
+                      </td>
+                      <td>
+                        <Badge tone={failed ? 'danger' : 'ok'}>{failed ? '실패' : '완료'}</Badge>
+                      </td>
+                      <td className={reason ? '' : 'dash'}>{reason ?? '—'}</td>
+                    </tr>
+                  )
+                })}
             </tbody>
           </table>
         </div>
