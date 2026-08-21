@@ -35,7 +35,6 @@ function list<V>(value: unknown): V[] {
 const LOGIN_MESSAGE: Record<T.LoginFailureCode, string> = {
   AUTH4001: '아이디 또는 비밀번호가 올바르지 않습니다.',
   AUTH4004: '비활성화된 계정입니다. 세모점 담당자에게 문의해 주세요.',
-  AUTH4005: '등록되지 않은 기기이거나 콘솔용 계정이 아닙니다. 기기 MAC 주소를 확인해 주세요.',
   forbiddenRole: '이 주소로는 들어올 수 없는 계정입니다.',
   unknown: '로그인하지 못했습니다. 잠시 뒤 다시 시도해 주세요.',
 }
@@ -47,9 +46,7 @@ const LOGIN_MESSAGE: Record<T.LoginFailureCode, string> = {
 function toLoginFailure(error: unknown): never {
   if (error instanceof ApiError) {
     const code: T.LoginFailureCode =
-      error.code === 'AUTH4004' || error.code === 'AUTH4001' || error.code === 'AUTH4005'
-        ? error.code
-        : 'unknown'
+      error.code === 'AUTH4004' ? 'AUTH4004' : error.code === 'AUTH4001' ? 'AUTH4001' : 'unknown'
     throw new LoginFailure(code, error.code ? LOGIN_MESSAGE[code] : error.message)
   }
   throw error
@@ -78,13 +75,8 @@ export const httpApi: Api = {
     },
 
     async login(input) {
-      // 기기 MAC 은 본문이 아니라 X-Device-Mac 헤더로 갑니다 (V28 — 콘솔 로그인 식별자)
-      const { deviceMac, ...body } = input
       const result = await http
-        .post<LoginResult>('/api/auth/login', body, {
-          anonymous: true,
-          headers: deviceMac ? { 'X-Device-Mac': deviceMac } : undefined,
-        })
+        .post<LoginResult>('/api/auth/login', input, { anonymous: true })
         .catch(toLoginFailure)
 
       const session: T.Session = {

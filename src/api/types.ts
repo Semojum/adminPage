@@ -604,21 +604,15 @@ export interface Session {
 export interface LoginInput {
   loginId: string
   password: string
-  /**
-   * 기기 MAC 주소 — 웹 콘솔 로그인은 항상 X-Device-Mac 헤더로 보냅니다 (V28).
-   * 서버는 이 헤더가 있으면 "콘솔 로그인"으로 보고 웹 관리자(admin_scope=WEB)+등록 기기만 들입니다.
-   */
-  deviceMac?: string
 }
 
 /**
  * 로그인이 막히는 이유.
  * - AUTH4001 아이디 또는 비밀번호 오류
  * - AUTH4004 비활성화된 계정(status=INACTIVE)
- * - AUTH4005 등록되지 않은 기기이거나 콘솔용 계정이 아님 (V28 — 웹 콘솔은 웹 관리자 전용)
  * - forbiddenRole  이 주소에 들어올 수 없는 역할 (화면 판단 — 서버는 role 만 알려 줍니다)
  */
-export type LoginFailureCode = 'AUTH4001' | 'AUTH4004' | 'AUTH4005' | 'forbiddenRole' | 'unknown'
+export type LoginFailureCode = 'AUTH4001' | 'AUTH4004' | 'forbiddenRole' | 'unknown'
 
 export class LoginFailure extends Error {
   constructor(
