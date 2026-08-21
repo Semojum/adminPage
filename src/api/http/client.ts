@@ -111,6 +111,8 @@ interface Options {
   anonymous?: boolean
   /** multipart 등 JSON 이 아닌 본문 */
   formData?: FormData
+  /** 추가 헤더 — 로그인의 X-Device-Mac(V28) 등 */
+  headers?: Record<string, string>
 }
 
 async function send(
@@ -119,7 +121,7 @@ async function send(
   options: Options,
   accessToken: string | null,
 ): Promise<Response> {
-  const headers: Record<string, string> = {}
+  const headers: Record<string, string> = { ...options.headers }
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'
 

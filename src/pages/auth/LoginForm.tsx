@@ -42,6 +42,8 @@ export function LoginForm({
 
   const [loginId, setLoginId] = useState('')
   const [password, setPassword] = useState('')
+  // 기기 MAC (V28) — 웹 콘솔 로그인은 등록 기기만 허용됩니다. 최초 1회 입력하면 이 브라우저에 저장됩니다.
+  const [deviceMac, setDeviceMac] = useState(() => localStorage.getItem(DEVICE_MAC_KEY) ?? '')
   const [error, setError] = useState<string | null>(
     (location.state as { forbidden?: boolean } | null)?.forbidden
       ? '이 화면을 볼 수 있는 계정으로 로그인해 주세요.'
@@ -65,7 +67,9 @@ export function LoginForm({
     event.preventDefault()
     setError(null)
     try {
-      goAfterLogin(await login({ loginId, password }))
+      const mac = deviceMac.trim()
+      localStorage.setItem(DEVICE_MAC_KEY, mac)
+      goAfterLogin(await login({ loginId, password, deviceMac: mac || undefined }))
     } catch (caught) {
       setError(
         caught instanceof LoginFailure
@@ -137,6 +141,22 @@ export function LoginForm({
           />
         </div>
 
+        <div className="login__field">
+          <label className="login__label" htmlFor={`${formId}-mac`}>
+            기기 MAC 주소
+          </label>
+          <input
+            id={`${formId}-mac`}
+            className="input"
+            placeholder="74:a6:cd:cf:4d:3a"
+            value={deviceMac}
+            onChange={(event) => setDeviceMac(event.target.value)}
+          />
+          <p className="login__desc">
+            등록된 기기에서만 로그인할 수 있습니다. 한 번 입력하면 이 브라우저에 저장됩니다.
+          </p>
+        </div>
+
         {error && (
           <p className="error-box" role="alert">
             {error}
@@ -160,6 +180,9 @@ export function LoginForm({
     </LoginLayout>
   )
 }
+
+/** 기기 MAC 저장 키 — 팀원마다 자기 기기에서 한 번만 입력하면 됩니다. */
+const DEVICE_MAC_KEY = 'semojum.deviceMac'
 
 const ROLE_LABEL: Record<Role, string> = {
   ROLE_ADMIN: '세모점 운영자',
