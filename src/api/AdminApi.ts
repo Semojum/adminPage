@@ -6,7 +6,8 @@ import type {
   CreateOrderInput,
   CreateOrgInput,
   CreatedOrg,
-  Inquiry,
+  InquiryDetail,
+  InquiryList,
   InquiryStatus,
   InquiryType,
   IssueCouponInput,
@@ -117,12 +118,17 @@ export interface Api {
     /** GET /api/admin/orders/{orderId}/receipt — presigned 15분 */
     getOrderReceipt(orderId: string): Promise<ReceiptLink>
 
-    /** GET /api/admin/inquiries?status=&type= */
-    getInquiries(params?: { status?: InquiryStatus; type?: InquiryType }): Promise<Inquiry[]>
+    /** GET /api/admin/inquiries?status=&type=&page=&size= — 목록(본문은 preview 100자) */
+    getInquiries(params?: {
+      status?: InquiryStatus
+      type?: InquiryType
+      page?: number
+      size?: number
+    }): Promise<InquiryList>
+    /** GET /api/admin/inquiries/{inquiryId} — 본문 전문·인라인 이미지·첨부 */
+    getInquiry(inquiryId: string): Promise<InquiryDetail>
     /** PATCH /api/admin/inquiries/{inquiryId}/status */
     setInquiryStatus(inquiryId: string, status: InquiryStatus): Promise<void>
-    /** GET /api/admin/inquiries/{inquiryId}/attachments/{attachmentId} — presigned 15분 */
-    getInquiryAttachment(inquiryId: string, attachmentId: string): Promise<ReceiptLink>
 
     /** GET /api/admin/notices */
     getNotices(): Promise<Notice[]>

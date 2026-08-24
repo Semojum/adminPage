@@ -232,19 +232,34 @@ export const httpApi: Api = {
 
     getInquiries: (params) =>
       http
-        .get<unknown>('/api/admin/inquiries', { status: params?.status, type: params?.type })
-        .then((result) =>
-          list<T.Inquiry>(result).map((inquiry) => ({
+        .get<T.InquiryList>('/api/admin/inquiries', {
+          status: params?.status,
+          type: params?.type,
+          page: params?.page,
+          size: params?.size,
+        })
+        .then((result) => ({
+          items: list<T.Inquiry>(result).map((inquiry) => ({
             ...inquiry,
-            // 첨부가 없으면 빈 배열입니다(명세) — 필드가 아예 없어도 버티게 둡니다.
-            attachments: Array.isArray(inquiry.attachments) ? inquiry.attachments : [],
+            preview: inquiry.preview ?? '',
+            attachmentCount: inquiry.attachmentCount ?? 0,
           })),
-        ),
+          page: result?.page ?? 0,
+          size: result?.size ?? 0,
+          totalElements: result?.totalElements ?? 0,
+          totalPages: result?.totalPages ?? 1,
+        })),
 
-    getInquiryAttachment: (inquiryId, attachmentId) =>
-      http.get<T.ReceiptLink>(
-        `/api/admin/inquiries/${encodeURIComponent(inquiryId)}/attachments/${encodeURIComponent(attachmentId)}`,
-      ),
+    // 인라인 이미지·첨부는 상세에만 있고 presigned URL 이 함께 옵니다(2026-08-24).
+    getInquiry: (inquiryId) =>
+      http
+        .get<T.InquiryDetail>(`/api/admin/inquiries/${encodeURIComponent(inquiryId)}`)
+        .then((result) => ({
+          ...result,
+          message: result?.message ?? '',
+          inlineImages: Array.isArray(result?.inlineImages) ? result.inlineImages : [],
+          attachments: Array.isArray(result?.attachments) ? result.attachments : [],
+        })),
 
     setInquiryStatus: (inquiryId, status) =>
       http

@@ -597,12 +597,12 @@ export const inquiries: T.Inquiry[] = [
     status: 'OPEN',
     orgName: '서울맹학교',
     loginId: 'snsb01',
-    message: '표가 들어간 쪽에서 변환이 자꾸 실패합니다. 확인 부탁드립니다.',
+    preview: '표가 들어간 쪽에서 변환이 자꾸 실패합니다. 확인 부탁드립니다.',
     senderEmail: null,
     subject: null,
     createdAt: hoursAgo(9),
     statusChangedAt: null,
-    attachments: [],
+    attachmentCount: 0,
   },
   {
     id: 'inq-2',
@@ -610,12 +610,12 @@ export const inquiries: T.Inquiry[] = [
     status: 'IN_REVIEW',
     orgName: null,
     loginId: null,
-    message: '점자 교재 제작 도입을 검토 중입니다. 견적을 받아볼 수 있을까요?',
+    preview: '점자 교재 제작 도입을 검토 중입니다. 견적을 받아볼 수 있을까요?',
     senderEmail: 'contact@oopub.co.kr',
     subject: 'OO출판사',
     createdAt: hoursAgo(26),
     statusChangedAt: hoursAgo(20),
-    attachments: [],
+    attachmentCount: 0,
   },
   {
     id: 'inq-4',
@@ -623,21 +623,13 @@ export const inquiries: T.Inquiry[] = [
     status: 'OPEN',
     orgName: null,
     loginId: null,
-    // 명세 §문의: 메일은 text/plain 이 없으면 HTML 원문이 그대로 옵니다.
-    message:
-      '<html><head><style>p{color:#333}</style></head><body><p>안녕하세요, 세모점 담당자님</p>' +
-      '<p>지난주에 보낸 교재 파일이 <b>표 부분</b>에서 계속 실패합니다.<br/>확인 부탁드립니다.</p>' +
-      '<table><tr><td>파일명</td><td>수능특강_생명II.pdf</td></tr><tr><td>쪽</td><td>8쪽</td></tr></table>' +
-      '<p>감사합니다.</p></body></html>',
+    // 목록의 preview 는 100자로 잘린 조각이고, 메일이면 HTML 원문일 수 있습니다.
+    preview: '<html><head><style>p{color:#333}</style></head><body><p>안녕하세요, 세모점 담당자님</p><p>지난주에 보',
     senderEmail: 'teacher@snsb.sc.kr',
     subject: '표 변환 실패 문의',
     createdAt: hoursAgo(30),
     statusChangedAt: null,
-    // 메일당 10개·파일당 10MB 까지 (명세 V27)
-    attachments: [
-      { id: 'att-1', fileName: '실패화면.png', contentType: 'image/png', sizeBytes: 184_320 },
-      { id: 'att-2', fileName: '수능특강_생명II.pdf', contentType: 'application/pdf', sizeBytes: 2_411_724 },
-    ],
+    attachmentCount: 2,
   },
   {
     id: 'inq-3',
@@ -645,14 +637,68 @@ export const inquiries: T.Inquiry[] = [
     status: 'ANSWERED',
     orgName: '한국점자도서관',
     loginId: 'kblib01',
-    message: '3,000 크레딧 추가 요청드립니다.',
+    preview: '3,000 크레딧 추가 요청드립니다.',
     senderEmail: null,
     subject: null,
     createdAt: hoursAgo(52),
     statusChangedAt: hoursAgo(48),
-    attachments: [],
+    attachmentCount: 0,
   },
 ]
+
+/** 목업에는 S3 가 없어 인라인 이미지를 그림으로 그려 넣습니다. */
+const sampleImage =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="240"><rect width="100%" height="100%" fill="#e2e8f0"/><text x="50%" y="50%" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#64748b">실패화면.png</text></svg>',
+  )
+
+/** 첨부 없는 문의는 목록 값 그대로 상세를 만듭니다. */
+function detailOf(id: string): T.InquiryDetail {
+  const item = inquiries.find((inquiry) => inquiry.id === id)!
+  return {
+    id: item.id,
+    type: item.type,
+    status: item.status,
+    orgName: item.orgName,
+    loginId: item.loginId,
+    senderEmail: item.senderEmail,
+    subject: item.subject,
+    message: item.preview,
+    createdAt: item.createdAt,
+    statusChangedAt: item.statusChangedAt,
+    inlineImages: [],
+    attachments: [],
+  }
+}
+
+/** 상세는 본문 전문과 인라인 이미지·첨부를 함께 줍니다. */
+export const inquiryDetails: Record<string, T.InquiryDetail> = {
+  'inq-1': detailOf('inq-1'),
+  'inq-2': detailOf('inq-2'),
+  'inq-3': detailOf('inq-3'),
+  'inq-4': {
+    ...detailOf('inq-4'),
+    message:
+      '<html><head><style>p{color:#333}</style></head><body><p>안녕하세요, 세모점 담당자님</p>' +
+      '<p>지난주에 보낸 교재 파일이 <b>표 부분</b>에서 계속 실패합니다.<br/>확인 부탁드립니다.</p>' +
+      '<table><tr><td>파일명</td><td>수능특강_생명II.pdf</td></tr><tr><td>쪽</td><td>8쪽</td></tr></table>' +
+      '<p>감사합니다.</p></body></html>',
+    // 서버가 대문자로 줄 때가 있어 그대로 흉내 냅니다.
+    inlineImages: [
+      { id: 'img-1', fileName: '실패화면.png', contentType: 'IMAGE/PNG', sizeBytes: 184_320, url: sampleImage },
+    ],
+    attachments: [
+      {
+        id: 'att-1',
+        fileName: '수능특강_생명II.pdf',
+        contentType: 'application/pdf',
+        sizeBytes: 2_411_724,
+        url: 'about:blank',
+      },
+    ],
+  },
+}
 
 /* ─────────────── T1-10 · 공지 ─────────────── */
 

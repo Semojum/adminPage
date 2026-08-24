@@ -444,17 +444,21 @@ export type InquiryType =
 export type InquiryStatus = 'OPEN' | 'IN_REVIEW' | 'ANSWERED'
 
 /**
- * 메일 문의 첨부 (V27, 2026-08-20).
- * 파일당 10MB · 메일당 10개까지 보관하고, 없으면 빈 배열입니다.
- * 내려받기는 별도 엔드포인트에서 presigned URL(15분)을 받습니다.
+ * 메일 문의에 딸린 파일 (V28, 2026-08-24).
+ *
+ * 상세 응답이 presigned URL(15분)을 **함께** 줍니다 — 따로 내려받기 API 를 부르지 않습니다.
+ * 만료되면 상세를 다시 조회해 새 URL 을 받습니다. URL 을 저장해 두고 재사용하지 않습니다.
  */
-export interface InquiryAttachment {
+export interface InquiryFile {
   id: string
   fileName: string
+  /** 서버가 대문자로 줄 때가 있습니다(IMAGE/PNG) — 비교할 때 소문자로 맞춥니다. */
   contentType: string
   sizeBytes: number
+  url: string
 }
 
+/** 목록 항목 — 본문은 preview(100자)뿐이고 첨부는 개수만 옵니다. */
 export interface Inquiry {
   id: string
   type: InquiryType
@@ -462,14 +466,46 @@ export interface Inquiry {
   /** 미가입(홈페이지) 문의는 null */
   orgName: string | null
   loginId: string | null
-  message: string
+  /** 본문 앞 100자. 메일이면 HTML 원문 조각일 수 있습니다. */
+  preview: string
   /** type === 'EMAIL' 일 때만 */
   senderEmail: string | null
   subject: string | null
   createdAt: string
   statusChangedAt: string | null
-  /** 메일 문의의 첨부·인라인 이미지. 그 외 유형은 빈 배열입니다. */
-  attachments: InquiryAttachment[]
+  /** 인라인 이미지 + 파일 첨부를 합한 개수 */
+  attachmentCount: number
+}
+
+/** 목록은 2026-08-21 부터 쪽 단위로 옵니다. */
+export interface InquiryList {
+  items: Inquiry[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
+/**
+ * 문의 상세 (2026-08-21 신설).
+ * 본문 전문과 인라인 이미지·첨부를 여기서만 받습니다.
+ */
+export interface InquiryDetail {
+  id: string
+  type: InquiryType
+  status: InquiryStatus
+  orgName: string | null
+  loginId: string | null
+  senderEmail: string | null
+  subject: string | null
+  /** 본문 전문 (최대 10,000자) */
+  message: string
+  createdAt: string
+  statusChangedAt: string | null
+  /** 메일 본문에 박힌 이미지 — 본문 아래에 바로 그립니다. */
+  inlineImages: InquiryFile[]
+  /** 파일 첨부 */
+  attachments: InquiryFile[]
 }
 
 /* ─────────────────── T1-10 · 공지 ─────────────────── */

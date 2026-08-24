@@ -40,8 +40,7 @@ export const qk = {
 
   inquiries: (status: InquiryStatus | 'all', type: InquiryType | 'all') =>
     ['admin', 'inquiries', status, type] as const,
-  inquiryAttachment: (inquiryId: string, attachmentId: string) =>
-    ['admin', 'inquiry', inquiryId, 'attachment', attachmentId] as const,
+  inquiry: (inquiryId: string) => ['admin', 'inquiry', inquiryId] as const,
   notices: ['admin', 'notices'] as const,
 
   orgDashboard: ['org', 'dashboard'] as const,
@@ -244,25 +243,30 @@ export const useUpdateOrder = (organizationId?: string) => {
 }
 
 /* ── T1-9 ── */
-export const useInquiries = (status: InquiryStatus | 'all', type: InquiryType | 'all') =>
+export const useInquiries = (
+  status: InquiryStatus | 'all',
+  type: InquiryType | 'all',
+  page = 0,
+) =>
   useQuery({
-    queryKey: qk.inquiries(status, type),
+    queryKey: [...qk.inquiries(status, type), page] as const,
     queryFn: () =>
       api.admin.getInquiries({
         status: status === 'all' ? undefined : status,
         type: type === 'all' ? undefined : type,
+        page,
       }),
   })
 
 /**
- * 첨부 내려받기 주소.
- * presigned 15분이라 오래 들고 있지 않습니다 — 이미지 미리보기용으로만 미리 받습니다.
+ * 문의 상세 — 본문 전문과 인라인 이미지·첨부가 여기에만 있습니다.
+ * 첨부 URL 이 presigned 15분이라 캐시에 오래 두지 않습니다.
  */
-export const useInquiryAttachment = (inquiryId: string, attachmentId: string, enabled: boolean) =>
+export const useInquiry = (inquiryId: string | null) =>
   useQuery({
-    queryKey: qk.inquiryAttachment(inquiryId, attachmentId),
-    queryFn: () => api.admin.getInquiryAttachment(inquiryId, attachmentId),
-    enabled,
+    queryKey: qk.inquiry(inquiryId ?? ''),
+    queryFn: () => api.admin.getInquiry(inquiryId!),
+    enabled: Boolean(inquiryId),
     staleTime: 0,
     gcTime: 60_000,
   })

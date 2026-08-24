@@ -31,6 +31,7 @@ const state = {
   coupons: structuredClone(fx.coupons),
   orders: structuredClone(fx.orders),
   inquiries: structuredClone(fx.inquiries),
+  inquiryDetails: structuredClone(fx.inquiryDetails),
   notices: structuredClone(fx.notices),
   orgDashboard: structuredClone(fx.orgDashboard),
   orgAccounts: structuredClone(fx.orgAccounts),
@@ -286,14 +287,30 @@ export const mockApi: Api = {
       return delay({ fileName: order.receiptFileName, url: 'about:blank' })
     },
 
-    getInquiries: (params) =>
-      delay(
-        state.inquiries.filter(
-          (inquiry) =>
-            (!params?.status || inquiry.status === params.status) &&
-            (!params?.type || inquiry.type === params.type),
-        ),
-      ),
+    getInquiries: (params) => {
+      const items = state.inquiries.filter(
+        (inquiry) =>
+          (!params?.status || inquiry.status === params.status) &&
+          (!params?.type || inquiry.type === params.type),
+      )
+      const size = params?.size ?? 20
+      const page = params?.page ?? 0
+      return delay({
+        items: items.slice(page * size, page * size + size),
+        page,
+        size,
+        totalElements: items.length,
+        totalPages: Math.max(1, Math.ceil(items.length / size)),
+      })
+    },
+
+    getInquiry: (inquiryId) => {
+      const detail = state.inquiryDetails[inquiryId]
+      if (!detail) return notFound<T.InquiryDetail>('문의')
+      // 상태는 목록에서 바뀔 수 있어 그때그때 맞춰 돌려줍니다.
+      const item = state.inquiries.find((inquiry) => inquiry.id === inquiryId)
+      return delay({ ...detail, status: item?.status ?? detail.status })
+    },
 
     setInquiryStatus: async (inquiryId, status) => {
       const inquiry = state.inquiries.find((item) => item.id === inquiryId)
@@ -301,21 +318,6 @@ export const mockApi: Api = {
       inquiry.status = status
       inquiry.statusChangedAt = nowIso()
       await delay(null)
-    },
-
-    getInquiryAttachment: (inquiryId, attachmentId) => {
-      const attachment = state.inquiries
-        .find((inquiry) => inquiry.id === inquiryId)
-        ?.attachments.find((item) => item.id === attachmentId)
-      if (!attachment) return notFound<T.ReceiptLink>('첨부')
-      // 목업에는 S3 가 없어, 이미지면 미리보기가 보이도록 그림을 하나 그려 넘깁니다.
-      const url = attachment.contentType.startsWith('image/')
-        ? 'data:image/svg+xml;utf8,' +
-          encodeURIComponent(
-            `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="270"><rect width="100%" height="100%" fill="#e2e8f0"/><text x="50%" y="50%" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#64748b">${attachment.fileName}</text></svg>`,
-          )
-        : 'about:blank'
-      return delay({ fileName: attachment.fileName, url })
     },
 
     getNotices: () => delay(state.notices),
@@ -392,12 +394,12 @@ export const mockApi: Api = {
           status: 'OPEN',
           orgName: state.orgDashboard.orgName,
           loginId: getStoredSession()?.loginId ?? null,
-          message: input.message ?? '',
+          preview: input.message ?? '',
           senderEmail: null,
           subject: null,
           createdAt: request.createdAt!,
           statusChangedAt: null,
-          attachments: [],
+          attachmentCount: 0,
         },
         ...state.inquiries,
       ]
