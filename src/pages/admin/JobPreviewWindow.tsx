@@ -9,9 +9,18 @@ import { useAuth } from '@/auth/AuthContext'
 import { WindowShell } from '@/layouts/WindowShell'
 import { resultFormat } from '@/lib/format'
 
-/** text_list · braille_text_list 는 문자열이거나 {contents} 입니다. */
-const textOf = (item: PageTextItem): string =>
-  typeof item === 'string' ? item : (item.contents ?? '')
+/**
+ * 블록 하나를 글자로.
+ *
+ * 실제 응답의 `contents` 는 **문자열 배열**입니다 — 이걸 문자열로 보고 다루면 터집니다.
+ * 통 문자열로 오는 경우도 있어 셋 다 받습니다.
+ */
+function textOf(item: PageTextItem): string {
+  if (typeof item === 'string') return item
+  const contents = item?.contents
+  if (Array.isArray(contents)) return contents.join('')
+  return typeof contents === 'string' ? contents : ''
+}
 
 /** 점자 유니코드(U+2800~U+28FF)가 섞여 있으면 점자 타이포로 보여줍니다. */
 const hasBraille = (text: string) => /[⠀-⣿]/.test(text)
@@ -23,7 +32,8 @@ const hasBraille = (text: string) => /[⠀-⣿]/.test(text)
  */
 function groupLines(lines: string[]): string[] {
   const blocks: string[][] = []
-  for (const line of lines) {
+  for (const raw of lines) {
+    const line = typeof raw === 'string' ? raw : String(raw ?? '')
     if (line.trim() === '') {
       if (blocks.length > 0 && blocks[blocks.length - 1].length > 0) blocks.push([])
       continue

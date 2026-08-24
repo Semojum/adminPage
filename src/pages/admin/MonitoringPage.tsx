@@ -59,6 +59,19 @@ function hoursFor(from: string): number {
   return Math.min(MONITORING_MAX_HOURS, Math.max(24, elapsed))
 }
 
+/**
+ * 지금 무엇을 조회하고 있는지 한 줄로.
+ *
+ * 날짜를 비워 두면 서버 기본값(최근 24시간)이 걸립니다 —
+ * 화면에 아무 표시가 없으면 "전체를 보고 있다"고 오해하게 되므로 그대로 적어 줍니다.
+ */
+function rangeText(filters: Filters): string {
+  if (!filters.from && !filters.to) return '최근 24시간'
+  if (filters.from && filters.to) return `${filters.from} ~ ${filters.to}`
+  if (filters.from) return `${filters.from} 이후`
+  return `${filters.to} 까지`
+}
+
 /** 고른 시작일이 서버가 주는 7일 범위를 넘었는지 */
 function beyondWindow(from: string): boolean {
   if (!from) return false
@@ -258,6 +271,9 @@ export function MonitoringPage() {
         </button>
 
         <span className="filters__count">
+          <span className="filters__label" style={{ marginRight: 6 }}>
+            조회 범위 {rangeText(filters)}
+          </span>
           {filtered ? `${number(visible.length)}건 / 전체 ${number(loaded.length)}건` : `${number(loaded.length)}건`}
         </span>
       </div>
@@ -333,8 +349,9 @@ export function MonitoringPage() {
       </Query>
 
       <p className="card__note">
-        상태는 업로드/진행 중/완료/부분 실패 · 목록에 재시도 버튼 없음 · 기관·작업명·계정·원가는 화면에서
-        거릅니다(서버는 상태·기간만 받습니다) · 원가로 거르면 아직 원가가 없는 진행 중 작업은 빠집니다
+        날짜를 비우면 <strong>최근 24시간</strong>만 조회합니다(서버 기본값) — 시작일을 고르면 그만큼
+        넓혀 가져옵니다(최대 7일) · 기관·작업명·계정·원가는 화면에서 거릅니다 · 원가로 거르면 아직 원가가
+        없는 진행 중 작업은 빠집니다 · 목록에 재시도 버튼 없음
       </p>
     </Card>
   )

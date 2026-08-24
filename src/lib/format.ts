@@ -239,6 +239,25 @@ export function jobStatusTone(job: {
   }
 }
 
+/**
+ * 쪽 상태.
+ * NEEDS_REVIEW 는 **실패가 아닙니다** — 변환은 됐고 확인이 권장되는 상태입니다.
+ * (작업 전체 상태는 COMPLETED 로 남고 failedPages 에도 안 잡힙니다)
+ */
+export const pageStatusLabel: Record<string, string> = {
+  COMPLETED: '완료',
+  NEEDS_REVIEW: '검토 필요',
+  BLOCKED: '실패',
+}
+
+export function pageStatusTone(status: string): 'ok' | 'warn' | 'danger' | 'muted' {
+  if (status === 'COMPLETED') return 'ok'
+  if (status === 'NEEDS_REVIEW') return 'warn'
+  if (status === 'BLOCKED') return 'danger'
+  // 모르는 값이면 색으로 단정하지 않습니다.
+  return 'muted'
+}
+
 export const layoutLabel: Record<LayoutType, string> = {
   PAGE_LAYOUT_TEXT: '본문',
   PAGE_LAYOUT_TABLE: '표',

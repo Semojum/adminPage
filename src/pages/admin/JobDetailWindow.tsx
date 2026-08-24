@@ -11,6 +11,8 @@ import {
   jobStatusTone,
   layoutLabel,
   number,
+  pageStatusLabel,
+  pageStatusTone,
   won,
 } from '@/lib/format'
 import { clientEnvironment } from '@/lib/userAgent'
@@ -134,7 +136,6 @@ export function JobDetailWindow() {
                 .sort((a, b) => a.pageNo - b.pageNo)
                 .map((page) => {
                   const reason = page.reasons.length > 0 ? page.reasons.join(' · ') : null
-                  const failed = page.status !== 'COMPLETED' || reason !== null
                   return (
                     <tr key={page.pageNo}>
                       <td className="num">{page.pageNo}</td>
@@ -147,7 +148,10 @@ export function JobDetailWindow() {
                         {page.credit === null ? <span className="dash">—</span> : number(page.credit)}
                       </td>
                       <td>
-                        <Badge tone={failed ? 'danger' : 'ok'}>{failed ? '실패' : '완료'}</Badge>
+                        {/* NEEDS_REVIEW 는 실패가 아니라 "검토 필요" 입니다. */}
+                        <Badge tone={pageStatusTone(page.status)}>
+                          {pageStatusLabel[page.status] ?? page.status}
+                        </Badge>
                       </td>
                       <td className={reason ? '' : 'dash'}>{reason ?? '—'}</td>
                     </tr>

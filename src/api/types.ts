@@ -205,9 +205,16 @@ export type JobStatusFilter = JobStatus | 'all'
 /* ─────────────────── T1-4 · 작업 상세 ─────────────────── */
 /* GET /api/admin/jobs/{jobId} */
 
+/**
+ * 쪽 상태 (2026-08-24 실제 응답 확인).
+ * COMPLETED 완료 / NEEDS_REVIEW 검토 필요(성공이지만 확인 권장) / BLOCKED 실패
+ */
+export type JobPageStatus = 'COMPLETED' | 'NEEDS_REVIEW' | 'BLOCKED'
+
 export interface JobPageResult {
   pageNo: number
-  status: string
+  /** 위 세 값 외에 새 값이 올 수 있어 문자열로 받습니다. */
+  status: JobPageStatus | string
   layoutType: LayoutType | null
   costKrw: Won | null
   /** 실패 쪽은 무차감이라 null */
@@ -258,8 +265,21 @@ export interface JobDetail {
 /* ─────────────────── T1-5 · 변환 결과 미리보기 ─────────────────── */
 /* GET /api/admin/jobs/{jobId}/pages/{pageNo} — 사용자 페이지 조회와 같은 구조 */
 
-/** text_list · braille_text_list 항목. 서버가 통 문자열로 줄 때도 있어 둘 다 받습니다. */
-export type PageTextItem = string | { id?: string | number; contents?: string }
+/**
+ * text_list · braille_text_list 항목.
+ *
+ * 실제 응답(2026-08-24 확인)은 `contents` 가 **문자열 배열**입니다 —
+ * `{ id, type, order, contents: ["...\n"], is_blocked, ... }`.
+ * 통 문자열로 올 때도 있어 둘 다 받습니다.
+ */
+export type PageTextItem =
+  | string
+  | {
+      id?: string | number
+      contents?: string | string[]
+      /** 막힌 블록 표시 */
+      is_blocked?: boolean
+    }
 
 export interface JobPageView {
   jobId: string
